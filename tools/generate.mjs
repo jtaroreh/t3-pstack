@@ -200,7 +200,7 @@ export function validatePluginLayout(pluginRoot) {
   }
 }
 
-const TIERS = ["default", "strongest", "panel"];
+const TIERS = ["default", "strongest", "panel", "workhorse"];
 
 // Check models.json's shape, throwing with the offending tier, role, or entry
 // named. `skillExists(skill)` reports whether a role's skill directory carries
@@ -237,6 +237,7 @@ export function parseModels(raw, skillExists) {
   }
   const labels = new Set();
   for (const role of raw.roles) {
+    if (Object.hasOwn(role, "optional") && typeof role.optional !== "boolean") fail(`role "${role.role}": optional must be a boolean`);
     for (const label of [role.role, role.alias].filter(Boolean)) {
       if (labels.has(label)) fail(`role "${label}" appears twice`);
       labels.add(label);

@@ -65,8 +65,8 @@ export function parseSheet(markdown) {
 
 // Problems with a parsed sheet, for the role vocabulary of models.json (each
 // role with its `tier`, and the `alias` a released sheet may still use), its
-// tier defaults, and an `orchestrator_capabilities` catalog. A role with no
-// line runs on its tier's default, so that default must dispatch here too.
+// tier defaults, and an `orchestrator_capabilities` catalog. A required role
+// with no line needs a runnable tier default. Optional modes check theirs on use.
 // With no catalog, as in the installer's doctor, only the grammar is checked.
 export function checkSheet(sheet, { roles, defaults, catalog }) {
   const problems = [];
@@ -120,7 +120,7 @@ export function checkSheet(sheet, { roles, defaults, catalog }) {
       }
     }
   }
-  for (const role of roles.filter((r) => !seen.has(r.role))) {
+  for (const role of roles.filter((r) => !r.optional && !seen.has(r.role))) {
     for (const entry of [defaults[role.tier]].flat()) {
       problems.push(...checkTarget(parseEntry(entry), catalog).map((p) => `${role.role} (no line, tier default): ${p}`));
     }

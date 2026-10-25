@@ -80,8 +80,35 @@ describe("checkSheet against a catalog", () => {
   test("the default sheet setup-pstack writes dispatches", () => {
     const setup = readFileSync(join(root, "plugins/pstack/skills/setup-pstack/SKILL.md"), "utf8");
     const sheet = setup.match(/```markdown\n(# pstack model configuration \(T3\)[\s\S]*?)```/)[1];
-    expect(parseSheet(sheet)).toHaveLength(roles.length + 1);
+    expect(parseSheet(sheet)).toHaveLength(roles.filter((r) => !r.optional).length + 1);
     expect(check(sheet)).toEqual([]);
+  });
+
+  test("an unused optional mode needs no provider, but explicit mode entries validate normally", () => {
+    expect(check("session hook: on")).toEqual([]);
+    expect(check("jtaroreh workhorse: codex/gpt-6.1-sol reasoningEffort=medium")).toEqual([]);
+    expect(check("jtaroreh advisor: inherit-parent\njtaroreh takeover: auto")).toEqual([]);
+    expect(check("jtaroreh workhorse: antigravity/gemini-3.8-flash-high")).toEqual([
+      'jtaroreh workhorse: antigravity/gemini-3.8-flash-high: no provider instance "antigravity" in this T3',
+    ]);
+    expect(check("jtaroreh workhorse: codex/gpt-6.1-sol reasoningEffort=invalid")).toEqual([
+      'jtaroreh workhorse: codex/gpt-6.1-sol: reasoningEffort=invalid is not one of low, medium, high, xhigh, max, ultra',
+    ]);
+    expect(check("jtaroreh workhorse: codex/gpt-6.1-sol, grok/grok-4.7")).toEqual([
+      "jtaroreh workhorse: takes one entry, not a list",
+    ]);
+  });
+
+  test("an optional mode target dispatches when present in the catalog", () => {
+    const withGemini = structuredClone(catalog);
+    withGemini.providers.push({
+      providerInstanceId: "antigravity",
+      models: [{ id: "gemini-3.8-flash-high", options: [] }],
+      canRunChildTask: true,
+      canRunCrossProviderChildTask: true,
+      constraints: [],
+    });
+    expect(check("jtaroreh workhorse: antigravity/gemini-3.8-flash-high", withGemini)).toEqual([]);
   });
 
   test("names each entry that cannot dispatch here", () => {

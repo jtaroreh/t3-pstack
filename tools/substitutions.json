@@ -1030,8 +1030,8 @@
       "hint": "Cursor model slug; point at the Models section (a T3 target such as grok/grok-4.7 is allowed)"
     },
     {
-      "regex": "\\b(?:claude|gpt|gemini|composer)-[0-9a-z.-]*-(?:max|fast|xhigh|high|medium|low|thinking)\\b",
-      "hint": "Cursor model slug with an effort suffix; point at the Models section"
+      "regex": "(?<!/)\\b(?:claude|gpt|gemini|composer)-[0-9a-z.-]*-(?:max|fast|xhigh|high|medium|low|thinking)\\b",
+      "hint": "Bare Cursor model slug with an effort suffix; use a catalog-verified T3 target in the Models section"
     },
     {
       "regex": "\\bCursor\\b|cursor\\.com",

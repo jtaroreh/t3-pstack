@@ -37,7 +37,7 @@ describe("parseModels", () => {
   };
   const role = (policy, label) => policy.roles.find((r) => r.role === label);
 
-  test.each(["default", "strongest", "panel"])("a missing %s tier throws naming it", (tier) => {
+  test.each(["default", "strongest", "panel", "workhorse"])("a missing %s tier throws naming it", (tier) => {
     expect(parse((p) => delete p.tiers[tier])).toThrow(`models.json: tiers has no "${tier}"`);
   });
 
@@ -74,6 +74,13 @@ describe("parseModels", () => {
     expect(parse((p) => (role(p, "bug-fix").alias = "strongest judgment"))).toThrow(
       'models.json: role "strongest judgment" appears twice',
     );
+  });
+
+  test("optional roles require boolean metadata and the workhorse tier is a concrete single target", () => {
+    expect(parse((p) => (role(p, "jtaroreh workhorse").optional = "true"))).toThrow("optional must be a boolean");
+    expect(parse((p) => (role(p, "jtaroreh workhorse").optional = false))()).toBeDefined();
+    expect(parse((p) => (p.tiers.workhorse = [p.tiers.workhorse]))).toThrow('tier "workhorse" must be one entry, not a list');
+    expect(parse((p) => (p.tiers.workhorse = "auto"))).toThrow('tier "workhorse" must name a target, not inherit the parent');
   });
 
   test("a role whose skill directory does not exist throws naming both", () => {

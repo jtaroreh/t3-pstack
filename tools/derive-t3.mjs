@@ -98,11 +98,12 @@ export function modelsSection(models, roles) {
 
 // The sheet setup-pstack writes when the user keeps every default.
 export function sheetBlock(models) {
-  const rows = models.roles.map((r) => `${r.role}: ${entries(models, r).join(", ")}`);
+  const rows = models.roles.map((r) => `${r.optional ? "# " : ""}${r.role}: ${entries(models, r).join(", ")}`);
   return [
     "# pstack model configuration (T3). One line per role. Delete a line to fall back to the skill default.",
     "# `inherit-parent` or `auto` as a value: the role runs on the parent chat's model (`delegate_task` omits `target`). Alias entries in a panel list still count toward its fan-out.",
     "# budget: large (xhigh)",
+    "# Optional mode roles are commented out. Configure them when selecting that mode.",
     ...rows,
     "session hook: on",
   ];

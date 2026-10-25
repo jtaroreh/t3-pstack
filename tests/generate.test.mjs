@@ -74,12 +74,12 @@ describe("locators", () => {
 
 describe("regions", () => {
   test("every skill a role names gets that role's tier default stamped in its Models section", () => {
-    const marked = { ...models, tiers: { default: "x/marker-default", strongest: "x/marker-strongest", panel: ["a/claude-p", "b/gpt-p"] } };
+    const marked = { ...models, tiers: { default: "x/marker-default", strongest: "x/marker-strongest", workhorse: "x/marker-workhorse", panel: ["a/claude-p", "b/gpt-p"] } };
     for (const skill of new Set(models.roles.map((r) => r.skill))) {
       const file = `plugins/pstack/skills/${skill}/SKILL.md`;
       const stamped = applyRegions(file, readFileSync(join(repoRoot, file), "utf8"), marked, { strict: true });
       for (const role of models.roles.filter((r) => r.skill === skill)) {
-        const expected = { default: "`x/marker-default`", strongest: "`x/marker-strongest`", panel: "`a/claude-p`, `b/gpt-p`" }[role.tier];
+        const expected = { default: "`x/marker-default`", strongest: "`x/marker-strongest`", workhorse: "`x/marker-workhorse`", panel: "`a/claude-p`, `b/gpt-p`" }[role.tier];
         expect(stamped).toContain(`- ${role.role}: ${expected}`);
       }
     }

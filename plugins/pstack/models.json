@@ -2,6 +2,7 @@
   "tiers": {
     "default": "claudeAgent/claude-opus-5-5 effort=xhigh",
     "strongest": "claudeAgent/claude-fable-5-1 effort=xhigh",
+    "workhorse": "antigravity/gemini-3.8-flash-high",
     "panel": [
       "claudeAgent/claude-opus-5-5 effort=xhigh",
       "codex/gpt-6.1-sol reasoningEffort=xhigh",
@@ -25,6 +26,9 @@
     { "role": "arena cross-judge pool", "tier": "panel", "skill": "arena" },
     { "role": "swarm workers", "tier": "default", "skill": "swarm" },
     { "role": "architect runners", "tier": "panel", "skill": "architect" },
-    { "role": "interrogate reviewers", "tier": "panel", "skill": "interrogate" }
+    { "role": "interrogate reviewers", "tier": "panel", "skill": "interrogate" },
+    { "role": "jtaroreh workhorse", "tier": "workhorse", "skill": "jtaroreh-mode", "optional": true },
+    { "role": "jtaroreh advisor", "tier": "default", "skill": "jtaroreh-mode", "optional": true },
+    { "role": "jtaroreh takeover", "tier": "strongest", "skill": "jtaroreh-mode", "optional": true }
   ]
 }

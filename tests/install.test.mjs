@@ -507,4 +507,19 @@ describe("the model sheet", () => {
       fix: "run /t3-pstack:setup-pstack in a T3 thread",
     });
   });
+
+  test("doctor recognizes optional mode roles and checks explicit targets when given a catalog", () => {
+    const { homes, sheet } = machine();
+    mkdirSync(join(sheet, ".."), { recursive: true });
+    writeFileSync(sheet, "jtaroreh workhorse: antigravity/gemini-3.8-flash-high\nsession hook: on\n");
+    expect(doctorSheet(sheet, homes, { catalog: null, roles, tiers })[0].ok).toBe(true);
+    const catalog = JSON.parse(readFileSync(join(repoRoot, "tests/fixtures/t3-catalog.json"), "utf8"));
+    const result = doctorSheet(sheet, homes, { catalog, roles, tiers })[0];
+    expect(result.ok).toBe(false);
+    expect(result.detail).toContain('no provider instance "antigravity"');
+    writeFileSync(sheet, "jtaroreh workhorse: Gemini Flash\n");
+    expect(doctorSheet(sheet, homes, { catalog: null, roles, tiers })[0].ok).toBe(false);
+    writeFileSync(sheet, "session hook: on\n");
+    expect(doctorSheet(sheet, homes, { catalog, roles, tiers })[0].ok).toBe(true);
+  });
 });

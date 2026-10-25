@@ -255,6 +255,11 @@ describe("denylistHits", () => {
     expect(denylistHits("synthesizer.md", "we renamed `gpt-4` to `gpt-4o` in `encodingForModel`", RULES.denylist)).toEqual([]);
   });
 
+  test("a namespaced T3 model can have a catalog-defined reasoning suffix", () => {
+    expect(denylistHits("mode.md", "antigravity/gemini-3.8-flash-high", RULES.denylist)).toEqual([]);
+    expect(denylistHits("mode.md", "gemini-3.8-flash-high", RULES.denylist)).toHaveLength(1);
+  });
+
   test("a team-kit driver points at the T3 surfaces", () => {
     const hits = denylistHits("playbook.md", "Drive with control-ui.", RULES.denylist);
     expect(hits).toHaveLength(1);
