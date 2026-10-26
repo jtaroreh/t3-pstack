@@ -81,6 +81,8 @@ Read the leaf skill in full for any principle you apply. Each entry names when i
 
 ## Autonomy
 
+For work that spans a handoff, interruption, or repeated verification attempts, use [bounded task recovery](references/task-recovery.md). Keep attempt counts, outstanding task IDs, and verification receipts in the task's existing note. Follow the host's task lifecycle when reconciling live work.
+
 **Just do it.** Use any MCP tool. Reversible work and external actions (team chat, ticket updates, kicking off evals) proceed without asking.
 
 **Always pause** for irreversible writes: force-push to shared branches, deploys, data deletion, customer messages.

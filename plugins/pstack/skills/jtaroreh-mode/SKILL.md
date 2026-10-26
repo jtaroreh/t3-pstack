@@ -36,6 +36,8 @@ Use [poteto-mode's Autonomy](../poteto-mode/SKILL.md#autonomy) within the user's
 
 Keep constraints and decisions in the task's existing plan. For work spanning turns, keep a short note outside tracked source, such as the path returned by `git rev-parse --git-path jtaroreh/<task-id>.md`. Resolve it to an absolute path for delegates. In a non-Git workspace, use a task-specific temporary directory. Record the goal, active constraints, review evidence, and next decision. Reload it after compaction or resumption. Keep one writer. Do not invent protected system prompts or write audit scratch into delivery files.
 
+For interrupted work or repeated verification attempts, use [bounded task recovery](../poteto-mode/references/task-recovery.md) in that same note. Preserve the attempt count, outstanding task IDs, and verification receipts across handoffs. The advisor and takeover limits below still apply.
+
 ## Subagents
 
 Read the machine's model sheet and call `orchestrator_capabilities` before dispatch. Resolve `jtaroreh workhorse`, `jtaroreh advisor`, and `jtaroreh takeover` from that sheet or the generated defaults below. Validate the actual provider, model, and options. These optional roles are omitted from ordinary setup unless selected. Validate their defaults when this mode starts. A missing role in the sheet is not permission to skip validation.
