@@ -49,3 +49,17 @@ Before handing work back, link the latest receipt and state what remains. Claim 
 ## Deliver evidence at the right size
 
 For a substantial change, link the plan, final verification evidence, and a short account of the resulting behavior. Keep intermediate logs and checkpoints as scratch evidence. For a small change, a concise reply with the relevant receipt is enough. Use the current host's file or artifact links rather than Antigravity-specific brain paths or metadata.
+
+## Run a bounded verifier
+
+For a Git worktree, [verify-task.mjs](../scripts/verify-task.mjs) executes one verification attempt per invocation. Use a note inside Git metadata or outside the worktree. It appends a machine-readable contract to that same note and preserves its existing text.
+
+```sh
+node <plugin>/skills/poteto-mode/scripts/verify-task.mjs init --note /absolute/task.md --cwd /absolute/worktree --verify "bun test" --limit 3 --timeout 120
+node <plugin>/skills/poteto-mode/scripts/verify-task.mjs run --note /absolute/task.md
+node <plugin>/skills/poteto-mode/scripts/verify-task.mjs status --note /absolute/task.md
+```
+
+Review the saved command before running it. The command executes with the caller's permissions. Each run spends one verification attempt before execution and writes a redacted output tail beside the note. This verifier budget does not replace the active playbook's corrective or review limits.
+
+A pass requires exit zero and unchanged tracked and untracked contents during verification. Later worktree changes make the receipt stale. Environment changes still require the agent to decide which checks to rerun. Interruptions and timeouts never pass. An unresolved prior process blocks another attempt. Reinitializing the same note cannot replenish its budget. The helper neither repairs code nor schedules work, resets Git, or grants review approval.
