@@ -28,14 +28,18 @@ export function enginePath(source, cwd) {
   throw new CloudError("ENGINE_MISSING", "Install agystack or pass --agystack-source pointing to its plugin directory.");
 }
 
-function progressLine(line) {
-  const progress = line.match(/^\[Cloud Swarm\] Progress: \d+\/\d+ succeeded, \d+ running, \d+ failed\./);
-  if (progress) process.stderr.write(`${progress[0]}\n`);
+function progressLine(line, onProgress) {
+  const match = line.match(/^\[Cloud Swarm\] Progress: (\d+)\/(\d+) succeeded, (\d+) running, (\d+) failed\./);
+  if (!match) return;
+  const [succeeded, total, running, failed] = match.slice(1).map(Number);
+  if (![succeeded, total, running, failed].every(Number.isSafeInteger) || total < 1 || succeeded + running + failed > total) return;
+  process.stderr.write(`[Cloud Swarm] Progress: ${succeeded}/${total} succeeded, ${running} running, ${failed} failed.\n`);
+  onProgress?.({ succeeded, total, running, failed });
 }
 
 // stderr is captured in a bounded tail for redacted diagnostics. It is never
 // forwarded: provider output can quote credential-bearing commands.
-export async function runProcess(command, args, { cwd, timeout = 120000, stream = false } = {}) {
+export async function runProcess(command, args, { cwd, timeout = 120000, stream = false, onProgress } = {}) {
   return new Promise((resolve, reject) => {
     let child;
     try {
@@ -47,7 +51,7 @@ export async function runProcess(command, args, { cwd, timeout = 120000, stream 
       reject(new CloudError("PROCESS_START_FAILED", "The external process did not finish. Its output was withheld. Use status or resume to reconcile the run."));
       return;
     }
-    let stdout = "", stderr = "", line = "", size = 0, failure, escalation;
+    let stdout = "", stderr = "", line = "", size = 0, failure, escalation, dropping = false;
     function kill(signal) {
       try { process.kill(-child.pid, signal); } catch { /* The process has already exited. */ }
     }
@@ -63,11 +67,17 @@ export async function runProcess(command, args, { cwd, timeout = 120000, stream 
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
       if (stream) {
-        line += chunk;
-        for (let newline; (newline = line.indexOf("\n")) !== -1;) {
-          progressLine(line.slice(0, newline)); line = line.slice(newline + 1);
+        for (const part of chunk.split(/(?<=\n)/)) {
+          if (!dropping) line += part;
+          if (line.length > 8192) { line = ""; dropping = true; }
+          if (part.endsWith("\n")) {
+            if (!dropping) {
+              try { progressLine(line.slice(0, -1), onProgress); }
+              catch { stop("PROGRESS_WRITE_FAILED"); }
+            }
+            line = ""; dropping = false;
+          }
         }
-        if (line.length > 8192) line = "";
       } else {
         size += Buffer.byteLength(chunk);
         if (size > OUTPUT_LIMIT) stop("PROCESS_OUTPUT_LIMIT");

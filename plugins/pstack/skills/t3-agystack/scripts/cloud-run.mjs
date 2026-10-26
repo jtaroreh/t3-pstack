@@ -5,7 +5,7 @@ import { CloudController, dispatchOptions } from "./cloud-controller.mjs";
 import { CloudError, RunStore, validateId } from "./cloud-state.mjs";
 
 const help = `Usage: cloud-run.mjs dispatch --client-request-id ID --manifest FILE [options]
-       cloud-run.mjs status|resume|cancel|harvest|attach RUN_ID [--json]
+       cloud-run.mjs status|resume|cancel|harvest|attach|progress RUN_ID [--json]
        cloud-run.mjs steer RUN_ID --task N|all --instruction TEXT --request-id ID [--json]
        cloud-run.mjs questions RUN_ID [--json]
        cloud-run.mjs reply RUN_ID --task N --seq N --text TEXT --request-id ID [--json]
@@ -68,7 +68,7 @@ try {
   if (values.help) process.stdout.write(help);
   else {
     const [verb, id] = positionals;
-    if (!["dispatch", "status", "resume", "cancel", "harvest", "list", "attach", "steer", "questions", "reply"].includes(verb)
+    if (!["dispatch", "status", "resume", "cancel", "harvest", "list", "attach", "progress", "steer", "questions", "reply"].includes(verb)
       || positionals.length !== (["dispatch", "list"].includes(verb) ? 1 : 2)
       || (verb === "dispatch" && ["task", "seq", "text", "instruction", "request-id"].some(key => key in values))
       || (verb !== "dispatch" && Object.keys(values).some(key => !["json", ...({ steer: ["task", "instruction", "request-id"], reply: ["task", "seq", "text", "request-id"] }[verb] ?? [])].includes(key)))) throw new CloudError("INVALID_ARGUMENT", "Use dispatch, status, resume, cancel, harvest, list or attach with the arguments shown in --help.");
@@ -77,7 +77,7 @@ try {
     const controller = new CloudController(store);
     const result = verb === "list" ? store.list() : verb === "dispatch" ? await controller.dispatch(values) : ["steer", "questions", "reply"].includes(verb) ? await controller.message(id, verb, values) : await controller[verb === "resume" ? "status" : verb](id);
     if (json) process.stdout.write(`${JSON.stringify(result)}\n`);
-    else if (["steer", "questions", "reply"].includes(verb)) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    else if (["steer", "questions", "reply", "progress"].includes(verb)) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     else for (const record of Array.isArray(result) ? result : [result]) {
       process.stdout.write(`${record.id} ${record.state}\n`);
       if (record.state === "corrupt") process.stdout.write(`Code: ${record.code}\n`);

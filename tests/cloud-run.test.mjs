@@ -581,3 +581,22 @@ test("cancellation remains available while a mailbox operation waits", async () 
   f.release("mailbox"); expect(await p.done).toBe(0);
   expect(f.record().state).toBe("cancelling");
 });
+
+test("progress survives observer restart and retains only bounded safe counters", async () => {
+  const f = fixture({ progressNoise: true });
+  const record = ok(f.run());
+  const child = f.start(["attach", record.id]);
+  await until(() => existsSync(join(f.root, "attached")));
+  await until(() => { const result = f.run(["progress", record.id]); return result.status === 0 && result.data?.at(-1)?.succeeded === 1; });
+  const events = ok(f.run(["progress", record.id]));
+  expect(events).toHaveLength(256);
+  expect(events.at(-1)).toMatchObject({ runId: record.id, taskIndex: null, phase: "progress", succeeded: 1 });
+  expect(JSON.stringify(events)).not.toContain("CLOUD_SENTINEL");
+  expect(events.every(e => e.succeeded + e.running + e.failed <= e.total)).toBe(true);
+  f.release("attached"); expect(await child.done).toBe(0);
+  f.set({ progressNoise: false });
+  const again = f.start(["attach", record.id]);
+  expect(await again.done).toBe(0);
+  expect(ok(f.run(["progress", record.id]))).toHaveLength(256);
+  expect(ok(f.run(["progress", record.id])).at(-1).succeeded).toBe(1);
+});

@@ -112,6 +112,24 @@ export class RunStore {
     } finally { if (existsSync(temporary)) unlinkSync(temporary); }
     return record;
   }
+  progress(id) {
+    this.require(id);
+    const path = `${this.path(id)}.progress`;
+    if (!existsSync(path)) return [];
+    checkPrivate(path, false);
+    if (lstatSync(path).size > 131072) throw new CloudError("STATE_CORRUPT", "Progress history exceeds its bound.");
+    let events;
+    try { events = JSON.parse(readFileSync(path, "utf8")); } catch { throw new CloudError("STATE_CORRUPT", "Progress history is unreadable."); }
+    if (!Array.isArray(events) || events.length > 256 || events.some(e => e.runId !== id || e.taskIndex !== null || e.phase !== "progress" || typeof e.time !== "string" || !Number.isFinite(Date.parse(e.time)) || ![e.succeeded, e.total, e.running, e.failed].every(Number.isSafeInteger))) throw new CloudError("STATE_CORRUPT", "Progress history is invalid.");
+    return events.map(({ runId, taskIndex, time, phase, succeeded, total, running, failed }) => ({ runId, taskIndex, time, phase, succeeded, total, running, failed }));
+  }
+  recordProgress(id, counts) {
+    const events = [...this.progress(id), { runId: id, taskIndex: null, time: new Date().toISOString(), phase: "progress", ...counts }].slice(-256);
+    const path = `${this.path(id)}.progress`, temporary = `${path}.${randomUUID()}.tmp`;
+    const fd = openSync(temporary, "wx", 0o600);
+    try { writeFileSync(fd, JSON.stringify(events)); fsyncSync(fd); } finally { closeSync(fd); }
+    try { renameSync(temporary, path); syncDirectory(this.root); } finally { if (existsSync(temporary)) unlinkSync(temporary); }
+  }
   // One unreadable record must not hide the rest. Permission failures still fail
   // closed: a record owned by someone else is a security problem, not damage.
   list() {

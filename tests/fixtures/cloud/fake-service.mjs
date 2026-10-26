@@ -177,7 +177,15 @@ if (engine) {
   }
   if (args.includes("--wait-execution")) {
     event({ kind: "attach", args, cwd: process.cwd() });
-    console.log(`[Cloud Swarm] Progress: 1/2 succeeded, 1 running, 0 failed. ${secret}`);
+    if (cfg.progressNoise) {
+      process.stdout.write("x".repeat(9000));
+      process.stdout.write("[Cloud Swarm] Progress: 0/2 succeeded, 0 running, 0 failed.\n");
+      console.log("[Cloud Swarm] Progress: 9/2 succeeded, 1 running, 0 failed.");
+      for (let i = 0; i < 270; i++) console.log("[Cloud Swarm] Progress: 0/2 succeeded, 2 running, 0 failed.");
+    }
+    process.stdout.write("[Cloud Swarm] Pro");
+    await new Promise(resolve => setTimeout(resolve, 10));
+    console.log(`gress: 1/2 succeeded, 1 running, 0 failed. ${secret}`);
     await hold("attached");
     if (cfg.attachFailure) failure();
     process.exit(0);
