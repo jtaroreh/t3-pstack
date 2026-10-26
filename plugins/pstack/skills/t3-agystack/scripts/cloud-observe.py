@@ -19,9 +19,8 @@ try:
         data = json.loads(result.stdout)
         status = data.get('status', data)
         counts = tuple(status.get(name, 0) for name in ['succeededCount', 'runningCount', 'failedCount'])
-        if any(type(n) is not int or n < 0 for n in counts) or sum(counts) > a.tasks:
-            raise ValueError('Invalid progress counters')
-        if counts != previous:
+        valid = all(type(n) is int and n >= 0 for n in counts) and sum(counts) <= a.tasks
+        if valid and counts != previous:
             print(f'[Cloud Swarm] Progress: {counts[0]}/{a.tasks} succeeded, {counts[1]} running, {counts[2]} failed.', flush=True)
             previous = counts
         complete = any(c.get('type') == 'Completed' and (str(c.get('status')) in ['True', 'False'] or c.get('state') in ['CONDITION_SUCCEEDED', 'CONDITION_FAILED']) for c in status.get('conditions', []))

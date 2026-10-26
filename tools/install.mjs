@@ -133,7 +133,7 @@ function render({ command, version, source, settings, homes, sheet, runtime, fai
     for (const step of steps) lines.push(`  - ${step}`);
     for (const c of checks) {
       lines.push(`  ${c.ok ? "ok  " : c.warn ? "warn" : "FAIL"}  ${c.name}: ${c.detail}`);
-      if (!c.ok) lines.push(`        fix: ${c.fix}`);
+      if (!c.ok && c.fix) lines.push(`        fix: ${c.fix}`);
     }
   };
   for (const row of homes) section(`${HARNESSES[row.harness].name}  ${row.dir}  (${row.from.join(", ")})`, row.steps, row.checks);

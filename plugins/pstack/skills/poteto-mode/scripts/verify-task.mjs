@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn, execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, renameSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { closeSync, existsSync, fsyncSync, lstatSync, openSync, mkdirSync, readFileSync, readlinkSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -26,13 +26,23 @@ function groupAlive(pid) {
   if (!Number.isSafeInteger(pid) || pid <= 0) return false;
   try { process.kill(-pid, 0); return true; } catch (error) { return error.code !== "ESRCH"; }
 }
+function writePrivate(path, contents) {
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    const fd = openSync(temporary, "wx", 0o600);
+    try { writeFileSync(fd, contents); fsyncSync(fd); } finally { closeSync(fd); }
+    renameSync(temporary, path);
+    const directory = openSync(dirname(path), "r");
+    try { fsyncSync(directory); } finally { closeSync(directory); }
+  } finally { if (existsSync(temporary)) unlinkSync(temporary); }
+}
 let server;
 try {
-  const { positionals, values: v } = parseArgs({ allowPositionals: true, options: { note: { type: "string" }, cwd: { type: "string" }, verify: { type: "string" }, limit: { type: "string" }, timeout: { type: "string" } } });
+  const { positionals, values: v } = parseArgs({ allowPositionals: true, options: { note: { type: "string" }, cwd: { type: "string" }, verify: { type: "string" }, limit: { type: "string" }, timeout: { type: "string" }, "assert-stopped": { type: "boolean" } } });
   const [verb] = positionals;
-  if (positionals.length !== 1 || !["init", "run", "status"].includes(verb) || !v.note) throw Error("usage: verify-task.mjs init --note FILE --cwd DIR --verify COMMAND --limit N [--timeout SECONDS], or run|status --note FILE");
+  if (positionals.length !== 1 || !["init", "run", "status", "reconcile"].includes(verb) || !v.note) throw Error("usage: verify-task.mjs init --note FILE --cwd DIR --verify COMMAND --limit N [--timeout SECONDS], or run|status --note FILE, or reconcile --note FILE --assert-stopped");
   const note = resolve(v.note);
-  if (verb !== "init" && Object.keys(v).some(k => k !== "note")) throw Error("run and status use the saved verification contract; only --note is accepted");
+  if (verb !== "init" && Object.keys(v).some(k => k !== "note" && !(verb === "reconcile" && k === "assert-stopped"))) throw Error("run and status use the saved verification contract; only --note is accepted");
   server = createServer();
   await new Promise((ok, fail) => { server.once("error", () => fail(Error("another verifier owns this note or its lock port"))); server.listen(20000 + parseInt(hash(note).slice(0,8),16) % 30000, "127.0.0.1", ok); });
   if (existsSync(note) && !lstatSync(note).isFile()) throw Error("the note must be a regular file");
@@ -43,7 +53,7 @@ try {
     const block = `\n<!-- pstack-verification ${JSON.stringify(state)} -->\n`;
     text = marker.test(text) ? text.replace(marker, () => block) : text + block;
     mkdirSync(dirname(note), { recursive: true });
-    const tmp = `${note}.${process.pid}.tmp`; writeFileSync(tmp, text, { mode: 0o600 }); renameSync(tmp, note);
+    writePrivate(note, text);
   }
   if (verb === "init") {
     if (state) throw Error("the note already has a verification contract; resuming never resets its budget");
@@ -58,6 +68,12 @@ try {
   } else {
     if (!state || state.version !== 1 || !Array.isArray(state.attempts)) throw Error("initialize a supported verification contract first");
     const last = state.attempts.at(-1);
+    if (verb === "reconcile") {
+      if (!v["assert-stopped"] || !last || !["running", "unresolved"].includes(last.outcome)) throw Error("reconcile requires an unresolved attempt and --assert-stopped after inspecting its processes");
+      if (alive(last.parentPid) || alive(last.childPid) || groupAlive(last.childPid)) throw Error("known verification processes remain active");
+      last.outcome = "interrupted"; last.exitCode = null; last.cleanupComplete = true;
+      last.operatorAssertedStoppedAt = new Date().toISOString(); save();
+    }
     if (verb === "run") {
       if (last?.childPid && groupAlive(last.childPid)) throw Error("previous verification process group remains active; reconcile it before another attempt");
       if (last?.outcome === "running") {
@@ -88,7 +104,7 @@ try {
       attempt.exitCode = result.code; attempt.finishedAt = new Date().toISOString();
       attempt.outcome = !attempt.cleanupComplete ? "unresolved" : timedOut ? "timeout" : interrupted || result.signal ? "interrupted" : spawnFailed ? "could not run" : result.code === 0 ? "pass" : "fail";
       attempt.evidence = `${note}.attempt-${attempt.number}.log`;
-      writeFileSync(attempt.evidence, redact(output), { mode: 0o600 });
+      writePrivate(attempt.evidence, redact(output));
       try { attempt.current = fingerprint(state.cwd) === before; } catch { attempt.current = false; }
       save();
       process.exitCode = attempt.outcome === "pass" && attempt.current ? 0 : interrupted ? 130 : 1;

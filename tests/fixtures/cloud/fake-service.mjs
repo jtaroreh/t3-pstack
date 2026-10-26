@@ -153,6 +153,11 @@ if (engine && args[1]?.endsWith("cloud-results.py")) {
   process.exit(0);
 }
 if (engine && args[1]?.endsWith("cloud-mailbox.py")) {
+  if (args.includes("--text")) throw Error("message payload must not appear on argv");
+  if (args.includes("--text-stdin")) {
+    const text = readFileSync(0, "utf8");
+    if (!text) throw Error("missing stdin message");
+  }
   event({kind:"mailbox",args});
   if (cfg.holdMailbox) await hold("mailbox");
   if (cfg.mailboxFailure) failure();

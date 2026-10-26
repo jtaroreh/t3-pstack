@@ -35,9 +35,9 @@ export async function workerMessage(controller, id, verb, options) {
     }
   }
   const args = ["-u", adapter, "--engine", record.engine, "--verb", verb, "--session-id", record.sessionId, "--gcs-bucket", record.plan.gcsBucket, "--max-tasks", String(record.plan.tasksCount)];
-  if (mutation) args.push("--task", task, "--text", text);
+  if (mutation) args.push("--task", task, "--text-stdin");
   if (verb === "reply") args.push("--seq", String(seq));
-  const result = await controller.external(id, verb, executable("python3"), args, { cwd: record.cwd });
+  const result = await controller.external(id, verb, executable("python3"), args, { cwd: record.cwd, ...(mutation ? { input: text } : {}) });
   if (result.code !== 0) throw new CloudError("MAILBOX_FAILED", "The mailbox operation failed. An empty question list or delivery must not be assumed.", { diagnostics: controller.diagnostics(record, verb, result.stderr) });
   const payload = parseJson(result.stdout);
   if (!Array.isArray(payload) || payload.length > (verb === "questions" ? 256 : record.plan.tasksCount) || payload.some(item => !item || !Number.isSafeInteger(item.taskIndex) || item.taskIndex < 0 || item.taskIndex >= record.plan.tasksCount || !Number.isSafeInteger(item.seq) || item.seq < 1

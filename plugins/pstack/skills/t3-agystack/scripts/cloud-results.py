@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import tempfile
 
@@ -13,7 +14,7 @@ def main():
     parser.add_argument("--max-tasks", required=True, type=int)
     parser.add_argument("--destination", required=True)
     args = parser.parse_args()
-    if not args.session_id.startswith("t3-") or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-" for c in args.session_id) or not 1 <= args.max_tasks <= 100000:
+    if not args.session_id.startswith("t3-") or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-" for c in args.session_id) or not 1 <= args.max_tasks <= 1000000:
         raise ValueError("Invalid run context")
     from google.cloud import storage
     bucket = storage.Client().bucket(args.gcs_bucket)
@@ -22,10 +23,17 @@ def main():
         raise ValueError("Unsafe artifact root")
     root.mkdir(parents=True, exist_ok=True)
     delivered = []
-    for index in range(args.max_tasks):
-        blob = bucket.get_blob(f"swarms/{args.session_id}/task-{index}/results.tsv")
-        if blob is None:
+    prefix = f"swarms/{args.session_id}/task-"
+    pattern = re.compile(re.escape(prefix) + r"(\d+)/results\.tsv$")
+    for count, blob in enumerate(bucket.list_blobs(prefix=prefix)):
+        if count >= 1000000:
+            raise ValueError("Artifact listing limit reached")
+        match = pattern.fullmatch(blob.name)
+        if not match:
             continue
+        index = int(match[1])
+        if index >= args.max_tasks:
+            raise ValueError("Artifact task is outside this run")
         if blob.size is None or blob.size > 64 * 1024 * 1024:
             raise ValueError("Artifact exceeds download limit")
         directory = root / f"task-{index}"

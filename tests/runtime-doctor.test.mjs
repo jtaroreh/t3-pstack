@@ -31,3 +31,9 @@ test("missing executables are distinct from timed out probes", () => {
   const f = fixture("setInterval(()=>{},1000)");
   expect(doctorRuntime("local", { env: { PATH: f.root }, timeout: 30 })[0].status).toBe("unknown");
 });
+
+test("v-prefixed executable versions retain their major number", () => {
+  const f = fixture('console.log("v24.9.0")');
+  const checks = doctorRuntime("local", { env: { PATH: f.root } });
+  expect(checks[0].detail).toBe("24.9.0");
+});

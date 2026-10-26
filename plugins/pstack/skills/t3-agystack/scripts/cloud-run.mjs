@@ -71,7 +71,7 @@ try {
     if (!["dispatch", "status", "resume", "cancel", "harvest", "list", "attach", "progress", "artifacts", "steer", "questions", "reply"].includes(verb)
       || positionals.length !== (["dispatch", "list"].includes(verb) ? 1 : 2)
       || (verb === "dispatch" && ["task", "seq", "text", "instruction", "request-id"].some(key => key in values))
-      || (verb !== "dispatch" && Object.keys(values).some(key => !["json", ...({ steer: ["task", "instruction", "request-id"], reply: ["task", "seq", "text", "request-id"] }[verb] ?? [])].includes(key)))) throw new CloudError("INVALID_ARGUMENT", "Use dispatch, status, resume, cancel, harvest, list or attach with the arguments shown in --help.");
+      || (verb !== "dispatch" && Object.keys(values).some(key => !["json", ...({ steer: ["task", "instruction", "request-id"], reply: ["task", "seq", "text", "request-id"] }[verb] ?? [])].includes(key)))) throw new CloudError("INVALID_ARGUMENT", "Use a supported verb and the arguments shown in --help.");
     if (id) validateId(id);
     const store = new RunStore();
     const controller = new CloudController(store);

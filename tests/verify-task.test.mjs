@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -79,4 +79,26 @@ test("timeout kills a TERM-resistant background group before another attempt", (
   try { process.kill(pid, 0); } catch (error) { if (error.code === "ESRCH") live = false; }
   expect(live).toBe(false);
   expect(JSON.parse(f.run(["status"]).stdout).passed).toBe(false);
+});
+
+test("evidence writes replace symlinks without touching their targets and use private modes", () => {
+  const f = fixture("printf receipt", 1);
+  const victim = join(f.root, ".git/victim"); writeFileSync(victim, "preserve");
+  const evidence = `${f.note}.attempt-1.log`; symlinkSync(victim, evidence);
+  expect(f.run(["run"]).status).toBe(0);
+  expect(readFileSync(victim, "utf8")).toBe("preserve");
+  expect(readFileSync(evidence, "utf8")).toBe("receipt");
+  expect(statSync(evidence).mode & 0o777).toBe(0o600);
+});
+test("unknown child recovery requires an explicit stopped-process assertion without resetting the budget", () => {
+  const f = fixture("true", 2);
+  let text = readFileSync(f.note, "utf8"); const match = text.match(/<!-- pstack-verification (.+) -->/);
+  const state = JSON.parse(match[1]); state.attempts.push({ number: 1, outcome: "running", parentPid: 999999, childPid: null });
+  writeFileSync(f.note, text.replace(match[1], JSON.stringify(state)));
+  expect(f.run(["run"]).status).toBe(1);
+  expect(f.run(["reconcile"]).status).toBe(1);
+  const result = f.run(["reconcile", "--assert-stopped"]);
+  expect(result.status, result.stderr).toBe(0);
+  expect(JSON.parse(result.stdout)).toMatchObject({ remaining: 1, passed: false, attempts: [{ outcome: "interrupted" }] });
+  expect(f.run(["run"]).status).toBe(0);
 });

@@ -648,3 +648,12 @@ test("attach does not follow an artifact root or implicitly invoke the harvester
   expect(f.events().filter(e => ["harvest", "results"].includes(e.kind))).toHaveLength(0);
   expect(f.record().harvest).toBeNull();
 });
+
+test("option-like steering text is delivered through stdin and kept off child argv", () => {
+  const f = fixture(); const run = ok(f.run());
+  ok(f.run(["steer", run.id, "--task", "0", "--instruction=--force", "--request-id", "option-text"]));
+  const delivery = f.events().find(e => e.kind === "mailbox");
+  expect(delivery.args).toContain("--text-stdin");
+  expect(delivery.args).not.toContain("--force");
+  expect(delivery.args).not.toContain("--text");
+});

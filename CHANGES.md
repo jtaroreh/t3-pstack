@@ -2,6 +2,10 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-T3 rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 2.1.0 - T3 workflow recovery and cloud operations
+
+Add optional local and cloud runtime diagnostics, live catalog option validation, and bounded executable verification receipts in existing task notes. Add worker steering and Q&A, deterministic candidate ranking with mixed metric directions, durable aggregate progress, and local artifact discovery with hashes and quarantine status. Harvest optional result tables and package adapter guides and ranking resources for Antigravity. T3 retains lifecycle ownership and patch application. Cloud behavior is checked with subprocess fixtures and optional native local-mailbox compatibility, without launching paid jobs.
+
 ## 2.0.0 - t3-pstack 2.0: Lauren's pstack, rewritten for T3
 
 2.0.0 is 2.0.0-rc.19 under its final version, with no change to any skill, script, or hooks file. The 2.0 line rebuilds t3-pstack on Lauren Tan's pstack at cursor/plugins, now at `e73df47` (pstack 0.15.32), with Cursor-specific text rewritten in place for T3 on Claude Code and Codex. The release candidates rc.1 to rc.19 below record each step. From here on, each sync of Lauren's pstack ships as a patch or minor release under semantic versioning, as [`CONTRIBUTING.md`](CONTRIBUTING.md#releasing) describes, and each release gets a GitHub release with its entry as notes.
