@@ -5,7 +5,7 @@ Give a fresh workhorse the absolute skill path and a task-specific temporary wor
 Use these scenarios when changing the mode.
 
 1. Fix a local documentation typo. Verify the real edit without unnecessary advisor calls.
-2. Implement an ordinary change spanning two files. Gemini owns execution and tests. Obtain one final advisor review rather than automatic plan and artifact reviews.
+2. Implement an ordinary change spanning two files or > 50 lines. Coordinator delegates implementation to a Gemini child workhorse to guard context. The child owns execution and tests, followed by an automated advisor review of the completed diff and receipts rather than automatic plan reviews.
 3. Change authentication cookie handling. Consult before the security decision and independently review the resulting artifact, regardless of diff size.
 4. Run on a non-Gemini parent. Delegate the bounded task once. Let Gemini consult its advisor directly. No repeated parent relay or nested workhorse.
 5. Give a final PASS, then change the implementation or requirement. Reassess the affected conclusion before completion.
