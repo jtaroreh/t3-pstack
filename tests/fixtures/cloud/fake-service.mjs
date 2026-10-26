@@ -127,6 +127,14 @@ function executionV2(name, session, state) {
   };
 }
 
+if (engine && args[1]?.endsWith("cloud-mailbox.py")) {
+  event({kind:"mailbox",args});
+  if (cfg.holdMailbox) await hold("mailbox");
+  if (cfg.mailboxFailure) failure();
+  if (!option("--engine")?.endsWith("cloud_dispatch.py") || !option("--session-id")?.startsWith("t3-") || option("--gcs-bucket") !== "test-bucket" || option("--max-tasks") !== "2") throw Error("mailbox context mismatch");
+  console.log(JSON.stringify(cfg.mailboxInvalid ? {bad:true} : option("--verb") === "questions" ? [{taskIndex:0,seq:1,question:"Which test should run?"}] : [{taskIndex:Number(option("--task") === "all" ? 0 : option("--task")),seq:1,status:"submitted"}]));
+  process.exit(0);
+}
 if (engine) {
   const booleanFlags = new Set(["--dry-run", "--no-wait", "--vertex", "--preflight"]);
   const valueFlags = new Set(["--manifest", "--session-id", "--gcs-prefix", "--repo", "--job-name", "--region", "--project", "--gcs-bucket", "--model", "--parent-model", "--vertex-location", "--base-branch", "--tasks", "--parallelism", "--max-retries", "--orchestrator-timeout", "--harvest-session", "--wait-execution"]);

@@ -59,7 +59,7 @@ function fixture(initial = {}) {
     release(name) { writeFileSync(join(root, `${name}.release`), ""); },
     dispose() {
       for (const child of children) if (child.exitCode === null) child.kill("SIGKILL");
-      for (const name of ["launching", "attached", "harvesting"]) {
+      for (const name of ["launching", "attached", "harvesting", "mailbox"]) {
         try { process.kill(Number(readFileSync(join(root, name), "utf8")), "SIGKILL"); } catch { /* Already exited. */ }
       }
       rmSync(root, { recursive: true, force: true });
@@ -550,4 +550,34 @@ test("state permissions fail closed and never invoke the engine", () => {
   mkdirSync(stateDir, { recursive: true, mode: 0o755 }); chmodSync(stateDir, 0o755);
   error(f.run(), "STATE_PERMISSIONS");
   expect(f.events()).toHaveLength(0);
+});
+
+
+test("worker messages use run-owned context and deduplicate a delivery request", () => {
+  const f=fixture();const run=ok(f.run());
+  const args=["steer",run.id,"--task","0","--instruction","Limit edits to the parser","--request-id","message-one"];
+  expect(ok(f.run(args))).toEqual([{taskIndex:0,seq:1,status:"submitted"}]);
+  expect(ok(f.run(args))).toEqual([{taskIndex:0,seq:1,status:"submitted"}]);
+  expect(f.events().filter(e=>e.kind==="mailbox")).toHaveLength(1);
+  error(f.run([...args.slice(0,5),"different",...args.slice(6)]),"REQUEST_COLLISION");
+  error(f.run(["steer",run.id,"--task","2","--instruction","x","--request-id","two"]),"INVALID_ARGUMENT");
+  expect(ok(f.run(["questions",run.id]))).toEqual([{taskIndex:0,seq:1,question:"Which test should run?"}]);
+  expect(ok(f.run(["reply",run.id,"--task","0","--seq","1","--text","Run parser tests","--request-id","answer-one"]))[0].status).toBe("submitted");
+  expect(JSON.stringify(f.record())).not.toContain("Limit edits");
+});
+test("failed mailbox access is not an empty listing or permission to resend", () => {
+  const f=fixture({mailboxFailure:true});const run=ok(f.run());
+  error(f.run(["questions",run.id]),"MAILBOX_FAILED");
+  const args=["steer",run.id,"--task","all","--instruction","Stop after this check","--request-id","uncertain"];
+  error(f.run(args),"MAILBOX_FAILED"); f.set({mailboxFailure:false});
+  error(f.run(args),"MESSAGE_UNCERTAIN");
+  f.set({mailboxInvalid:true}); error(f.run(["questions",run.id]),"MAILBOX_INVALID");
+});
+test("cancellation remains available while a mailbox operation waits", async () => {
+  const f=fixture({holdMailbox:true});const run=ok(f.run());
+  const p=f.start(["steer",run.id,"--task","0","--instruction","Inspect tests","--request-id","slow"]);
+  await until(()=>existsSync(join(f.root,"mailbox")));
+  expect(ok(f.run(["cancel",run.id])).state).toBe("cancelling");
+  f.release("mailbox"); expect(await p.done).toBe(0);
+  expect(f.record().state).toBe("cancelling");
 });

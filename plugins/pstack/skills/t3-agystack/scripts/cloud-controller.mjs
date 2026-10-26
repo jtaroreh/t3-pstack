@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { CloudError, hash, runId, sessionId, terminal } from "./cloud-state.mjs";
 import { enginePath, executable, parseDryRun, parseJson, runProcess } from "./cloud-process.mjs";
 
+import { workerMessage } from "./cloud-messages.mjs";
+
 const now = () => new Date().toISOString();
 // Cloud Run caps job and execution resource names at 63 characters (job names are
 // further constrained in practice because revisions and executions append suffixes).
@@ -336,6 +338,7 @@ export class CloudController {
     record.observedAt = now();
     return this.save(record);
   }
+  async message(id, verb, options) { return workerMessage(this, id, verb, options); }
   async status(id) { return this.store.locked(id, () => this.refresh(this.store.require(id))); }
   async cancel(id) {
     return this.store.locked(id, async () => {
