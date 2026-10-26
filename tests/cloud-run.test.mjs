@@ -634,3 +634,17 @@ test("missing results remain missing and interrupted harvest remains quarantined
   expect(await child.done).not.toBe(0);
   expect(ok(f.run(["artifacts", record.id]))).toMatchObject({ harvest: "interrupted", artifacts: [{ kind: "patch", status: "quarantined" }] });
 });
+test("ordinary credential-shaped questions remain valid structured responses", () => {
+  const f = fixture({ question: "Which token budget?" }); const run = ok(f.run());
+  const questions = ok(f.run(["questions", run.id]));
+  expect(questions).toHaveLength(1); expect(questions[0].question).toContain("Which token");
+});
+test("attach does not follow an artifact root or implicitly invoke the harvester", async () => {
+  const f = fixture(); const run = ok(f.run());
+  mkdirSync(join(f.root, ".slices")); symlinkSync(f.root, join(f.root, ".slices", run.sessionId));
+  const child = f.start(["attach", run.id]);
+  await until(() => existsSync(join(f.root, "attached"))); f.release("attached");
+  expect(await child.done).toBe(0);
+  expect(f.events().filter(e => ["harvest", "results"].includes(e.kind))).toHaveLength(0);
+  expect(f.record().harvest).toBeNull();
+});

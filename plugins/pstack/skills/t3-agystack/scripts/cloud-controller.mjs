@@ -417,7 +417,7 @@ export class CloudController {
     const record = await this.status(id);
     if (!record.execution) throw new CloudError("EXECUTION_UNRESOLVED", "Use resume to recover an execution handle before attaching.");
     // Observation holds no mutation lock, so a separate cancel command can run.
-    const result = await this.external(id, "attach", executable("python3"), ["-u", record.engine, ...planFlags(record.plan), "--wait-execution", record.execution, "--session-id", record.sessionId, "--gcs-prefix", `swarms/${record.sessionId}`], { cwd: record.cwd, timeout: 0, stream: true, onProgress: counts => this.store.recordProgress(id, counts) });
+    const result = await this.external(id, "attach", executable("python3"), ["-u", fileURLToPath(new URL("./cloud-observe.py", import.meta.url)), "--execution", record.execution, "--project", record.plan.project, "--region", record.plan.region, "--tasks", String(record.plan.tasksCount)], { cwd: record.cwd, timeout: 0, stream: true, onProgress: counts => this.store.recordProgress(id, counts) });
     const refreshed = await this.status(id);
     if (result.code !== 0) {
       const diagnostics = this.diagnostics(record, "attach", result.stderr);

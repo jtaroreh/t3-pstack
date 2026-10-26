@@ -22,6 +22,10 @@ function alive(pid) {
   if (!Number.isSafeInteger(pid) || pid <= 0) return false;
   try { process.kill(pid, 0); return true; } catch (e) { return e.code !== "ESRCH"; }
 }
+function groupAlive(pid) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+  try { process.kill(-pid, 0); return true; } catch (error) { return error.code !== "ESRCH"; }
+}
 let server;
 try {
   const { positionals, values: v } = parseArgs({ allowPositionals: true, options: { note: { type: "string" }, cwd: { type: "string" }, verify: { type: "string" }, limit: { type: "string" }, timeout: { type: "string" } } });
@@ -55,6 +59,7 @@ try {
     if (!state || state.version !== 1 || !Array.isArray(state.attempts)) throw Error("initialize a supported verification contract first");
     const last = state.attempts.at(-1);
     if (verb === "run") {
+      if (last?.childPid && groupAlive(last.childPid)) throw Error("previous verification process group remains active; reconcile it before another attempt");
       if (last?.outcome === "running") {
         if (alive(last.parentPid) || alive(last.childPid) || !last.childPid) throw Error("previous verification is active or unresolved; reconcile its processes before another run");
         last.outcome = "interrupted"; last.exitCode = null; save();
@@ -73,9 +78,15 @@ try {
       const capture = chunk => { output = (output + chunk.toString()).slice(-65536); };
       child.stdout.on("data", capture); child.stderr.on("data", capture); child.on("error", () => { spawnFailed = true; });
       const result = await new Promise(done => child.on("close", (code, signal) => done({ code, signal })));
-      clearTimeout(timer); clearTimeout(escalation); process.removeListener("SIGINT", interrupt); process.removeListener("SIGTERM", interrupt);
+      clearTimeout(timer);
+      if (groupAlive(child.pid)) stop();
+      if (escalation) await new Promise(resolve => setTimeout(resolve, 550));
+      const cleanupDeadline = Date.now() + 1500;
+      while (groupAlive(child.pid) && Date.now() < cleanupDeadline) await new Promise(resolve => setTimeout(resolve, 25));
+      attempt.cleanupComplete = !groupAlive(child.pid);
+      clearTimeout(escalation); process.removeListener("SIGINT", interrupt); process.removeListener("SIGTERM", interrupt);
       attempt.exitCode = result.code; attempt.finishedAt = new Date().toISOString();
-      attempt.outcome = interrupted || result.signal ? "interrupted" : timedOut ? "timeout" : spawnFailed ? "could not run" : result.code === 0 ? "pass" : "fail";
+      attempt.outcome = !attempt.cleanupComplete ? "unresolved" : timedOut ? "timeout" : interrupted || result.signal ? "interrupted" : spawnFailed ? "could not run" : result.code === 0 ? "pass" : "fail";
       attempt.evidence = `${note}.attempt-${attempt.number}.log`;
       writeFileSync(attempt.evidence, redact(output), { mode: 0o600 });
       try { attempt.current = fingerprint(state.cwd) === before; } catch { attempt.current = false; }
@@ -85,7 +96,7 @@ try {
   }
   const last = state.attempts.at(-1);
   let current = false; try { current = !!last && fingerprint(state.cwd) === last.fingerprint; } catch {}
-  console.log(JSON.stringify({ ...state, current, remaining: state.limit - state.attempts.length, passed: last?.outcome === "pass" && current }));
+  console.log(JSON.stringify({ ...state, current, remaining: state.limit - state.attempts.length, passed: last?.outcome === "pass" && last.current === true && last.cleanupComplete === true && current }));
 } catch (error) {
   console.error(JSON.stringify({ error: redact(error.message) })); process.exitCode = 1;
 } finally { server?.close(); }

@@ -57,3 +57,26 @@ test("verification from a subdirectory detects changed untracked files elsewhere
   writeFileSync(join(f.root, "outside-package.txt"), "changed");
   expect(JSON.parse(f.run(["status"]).stdout).passed).toBe(false);
 });
+test("a command that changed its tested inputs can never regain a passing receipt", () => {
+  const f = fixture("printf B > user.txt; test \"$(cat user.txt)\" = B", 1);
+  const run = f.run(["run"]);
+  expect(run.status).toBe(1);
+  expect(JSON.parse(run.stdout)).toMatchObject({ passed: false, attempts: [{ current: false }] });
+  writeFileSync(join(f.root, "user.txt"), "keep me");
+  expect(JSON.parse(f.run(["status"]).stdout).passed).toBe(false);
+});
+test("timeout kills a TERM-resistant background group before another attempt", () => {
+  const f = fixture("true", 2);
+  const worker = join(f.root, ".git/worker.cjs"), pidFile = join(f.root, ".git/worker.pid");
+  writeFileSync(worker, `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);`);
+  let text = readFileSync(f.note, "utf8");
+  const match = text.match(/<!-- pstack-verification (.+) -->/);
+  const state = JSON.parse(match[1]); state.verifyCommand = `node '${worker}' >/dev/null 2>&1 & wait`; state.timeoutSeconds = 0.3;
+  writeFileSync(f.note, text.replace(match[1], JSON.stringify(state)));
+  expect(f.run(["run"]).status).toBe(1);
+  const pid = Number(readFileSync(pidFile, "utf8"));
+  let live = true;
+  try { process.kill(pid, 0); } catch (error) { if (error.code === "ESRCH") live = false; }
+  expect(live).toBe(false);
+  expect(JSON.parse(f.run(["status"]).stdout).passed).toBe(false);
+});

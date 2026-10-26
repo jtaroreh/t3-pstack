@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 import argparse
-import contextlib
-import io
 import json
 from pathlib import Path
 import re
@@ -71,8 +69,18 @@ try:
         result = []
         for task in tasks:
             if a.verb == 'steer':
-                with contextlib.redirect_stdout(io.StringIO()):
-                    envelope = messenger.send_steer(task, a.text)
+                inbox = f'{prefix}task-{task}/inbox/'
+                sequences = []
+                for count, existing in enumerate(messenger.bucket.list_blobs(prefix=inbox)):
+                    if count >= 4096:
+                        raise ValueError('steering listing limit reached')
+                    match = re.fullmatch(re.escape(inbox) + r'(\d+)_steer\.json', existing.name)
+                    if match:
+                        sequences.append(int(match[1]))
+                seq = max(sequences, default=0) + 1
+                envelope = MailboxEnvelope(session_id=a.session_id, task_index=task, seq=seq, msg_type=MessageType.STEER, sender='orchestrator', recipient=f'worker-{task}', timestamp=time.time(), payload={'instruction': a.text, 'text': a.text}, status=MessageStatus.PENDING)
+                blob = messenger.bucket.blob(f'{inbox}{seq:04d}_steer.json')
+                blob.upload_from_string(envelope.to_json(), content_type='application/json', if_generation_match=0, retry=None)
                 result.append({'taskIndex': task, 'seq': envelope.seq, 'status': 'submitted'})
             else:
                 if not a.seq or a.seq < 1:
@@ -80,7 +88,7 @@ try:
                 question(messenger.bucket.blob(f'{prefix}task-{task}/outbox/{a.seq:04d}_question.json'))
                 envelope = MailboxEnvelope(session_id=a.session_id, task_index=task, seq=a.seq, msg_type=MessageType.REPLY, sender='orchestrator', recipient=f'worker-{task}', timestamp=time.time(), payload={'reply': a.text, 'text': a.text}, status=MessageStatus.PENDING, reply_to_seq=a.seq)
                 blob = messenger.bucket.blob(f'{prefix}task-{task}/inbox/{a.seq:04d}_reply.json')
-                blob.upload_from_string(envelope.to_json(), content_type='application/json', if_generation_match=0)
+                blob.upload_from_string(envelope.to_json(), content_type='application/json', if_generation_match=0, retry=None)
                 result.append({'taskIndex': task, 'seq': a.seq, 'status': 'submitted'})
     print(json.dumps(result))
 except Exception:

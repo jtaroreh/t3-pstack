@@ -42,7 +42,7 @@ within its scan cap; an incomplete scan stays unresolved.
 cancel requests remote cancellation, then checks its outcome. Killing this
 controller or interrupting attach does not cancel the remote execution.
 attach streams safe progress counters to stderr and a final record to stdout.
-It omits raw worker logs and can harvest through the engine when it finishes.
+It omits raw worker logs and never downloads artifacts. Use harvest explicitly.
 harvest does not hold the run's mutation lock while it downloads, so cancel
 stays available; it records download metadata separately from the remote outcome.
 Any failing verb writes the last 50 redacted stderr lines to a 0600 file beside

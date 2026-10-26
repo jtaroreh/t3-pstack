@@ -39,10 +39,13 @@ export async function workerMessage(controller, id, verb, options) {
   if (verb === "reply") args.push("--seq", String(seq));
   const result = await controller.external(id, verb, executable("python3"), args, { cwd: record.cwd });
   if (result.code !== 0) throw new CloudError("MAILBOX_FAILED", "The mailbox operation failed. An empty question list or delivery must not be assumed.", { diagnostics: controller.diagnostics(record, verb, result.stderr) });
-  const payload = parseJson(redact(result.stdout));
+  const payload = parseJson(result.stdout);
   if (!Array.isArray(payload) || payload.length > (verb === "questions" ? 256 : record.plan.tasksCount) || payload.some(item => !item || !Number.isSafeInteger(item.taskIndex) || item.taskIndex < 0 || item.taskIndex >= record.plan.tasksCount || !Number.isSafeInteger(item.seq) || item.seq < 1
     || (verb === "questions" ? typeof item.question !== "string" || item.question.length > 8000 : item.status !== "submitted"))) throw new CloudError("MAILBOX_INVALID", "Mailbox returned an invalid response.");
-  const safe = payload.map(item => verb === "questions" ? { taskIndex: item.taskIndex, seq: item.seq, question: item.question } : { taskIndex: item.taskIndex, seq: item.seq, status: "submitted" });
+  if (mutation && (payload.length !== (verb === "steer" && task === "all" ? record.plan.tasksCount : 1)
+    || new Set(payload.map(item => item.taskIndex)).size !== payload.length
+    || payload.some(item => (task !== "all" && item.taskIndex !== Number(task)) || (verb === "reply" && item.seq !== seq)))) throw new CloudError("MAILBOX_INVALID", "Mailbox acknowledgment does not match the reserved delivery.");
+  const safe = payload.map(item => verb === "questions" ? { taskIndex: item.taskIndex, seq: item.seq, question: redact(item.question) } : { taskIndex: item.taskIndex, seq: item.seq, status: "submitted" });
   if (mutation) await controller.store.locked(id, () => {
     const current = controller.store.require(id);
     current.messages[key] = { ...current.messages[key], status: "submitted", result: safe };
