@@ -287,3 +287,14 @@ describe("the T3 session-start context", () => {
     }
   });
 });
+
+describe("live catalog option values", () => {
+  test("accepts advertised string, numeric, and boolean values without dropping legacy options", () => {
+    const live = structuredClone(catalog);
+    const model = live.providers.find(p => p.providerInstanceId === "codex").models.find(m => m.id === "gpt-6.1-sol");
+    model.options = [{ id: "reasoningEffort", values: ["low", "high", "xhigh"] }, { id: "tokens", values: [100, 200] }, { id: "fast", values: [false, true] }, { id: "legacy", options: [{ id: "yes" }] }];
+    expect(check("bug-fix: codex/gpt-6.1-sol reasoningEffort=high tokens=100 fast=false legacy=yes", live)).toEqual([]);
+    expect(check("bug-fix: codex/gpt-6.1-sol tokens=300 fast=maybe", live).join("\n")).toContain("tokens=300 is not one of 100, 200");
+    expect(check("bug-fix: codex/gpt-6.1-sol fast=maybe", live).join("\n")).toContain("fast=maybe is not one of false, true");
+  });
+});

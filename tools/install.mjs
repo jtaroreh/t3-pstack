@@ -29,6 +29,7 @@ import { doctorCodex, installCodex } from "./install/codex.mjs";
 import { check, hasCli, HOME_REPO, INSTALL_HINT, parseSource, readJson } from "./install/common.mjs";
 import { discoverHomes } from "./install/homes.mjs";
 import { doctorSheet, moveSheet, sheetPath } from "./install/sheet.mjs";
+import { doctorRuntime } from "./install/runtime.mjs";
 import { FROZEN_HOOKS } from "./plugin.mjs";
 
 const HARNESSES = {
@@ -38,7 +39,7 @@ const HARNESSES = {
 
 const USAGE =
   "usage: t3-pstack <install|update|doctor> [--source <owner/repo|git URL|dir>] " +
-  "[--claude-home <dir>]... [--codex-home <dir>]... [--catalog <file>] [--json]";
+  "[--claude-home <dir>]... [--codex-home <dir>]... [--catalog <file>] [--runtime local|cloud] [--agystack-source <dir>] [--json]";
 
 // What to converge on comes from the plugin this run installs: the local
 // source, or else this package, which is the marketplace's own repo. `skills`
@@ -67,11 +68,15 @@ async function run(argv, env, home) {
       "claude-home": { type: "string", multiple: true, default: [] },
       "codex-home": { type: "string", multiple: true, default: [] },
       catalog: { type: "string" },
+      runtime: { type: "string" },
+      "agystack-source": { type: "string" },
       json: { type: "boolean", default: false },
     },
   });
   const [command] = positionals;
   if (positionals.length !== 1 || !["install", "update", "doctor"].includes(command)) return { usage: true };
+  if ((values.runtime && (command !== "doctor" || !["local", "cloud"].includes(values.runtime)))
+    || (values["agystack-source"] && values.runtime !== "cloud")) return { usage: true };
 
   const source = parseSource(values.source ?? HOME_REPO, home);
   const facts = pluginFacts(source.local ?? fileURLToPath(new URL("..", import.meta.url)));
@@ -113,13 +118,14 @@ async function run(argv, env, home) {
     report.sheet.checks.push(check("move", false, err.message, INSTALL_HINT));
   }
   report.sheet.checks.push(...doctorSheet(sheet, homes, { catalog, roles: facts.roles, tiers: facts.tiers }));
-  const all = [...report.homes.flatMap((row) => row.checks), ...report.sheet.checks];
+  if (values.runtime) report.runtime = doctorRuntime(values.runtime, { env, source: values["agystack-source"] });
+  const all = [...report.homes.flatMap((row) => row.checks), ...report.sheet.checks, ...(report.runtime ?? [])];
   report.failed = all.filter((c) => !c.ok && !c.warn).length;
   report.warnings = all.filter((c) => !c.ok && c.warn).length;
   return { report, json: values.json };
 }
 
-function render({ command, version, source, settings, homes, sheet, failed, warnings }, home) {
+function render({ command, version, source, settings, homes, sheet, runtime, failed, warnings }, home) {
   const lines = [`t3-pstack ${version} from ${source}`];
   lines.push(`T3 settings: ${settings.path}${settings.error ? ` (${settings.error})` : `, ${settings.instances} Claude Code or Codex instances`}`);
   const section = (title, steps, checks) => {
@@ -132,6 +138,7 @@ function render({ command, version, source, settings, homes, sheet, failed, warn
   };
   for (const row of homes) section(`${HARNESSES[row.harness].name}  ${row.dir}  (${row.from.join(", ")})`, row.steps, row.checks);
   section(`Model sheet  ${sheet.path}`, sheet.steps, sheet.checks);
+  if (runtime) section("Runtime prerequisites", [], runtime);
   const changed = [...homes.flatMap((row) => row.steps), ...sheet.steps].length;
   const count = (n, noun) => `${n} ${noun}${n === 1 ? "" : "s"}`;
   lines.push(

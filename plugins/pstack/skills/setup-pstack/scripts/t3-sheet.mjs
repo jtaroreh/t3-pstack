@@ -143,7 +143,7 @@ function checkTarget({ providerInstanceId, model, options }, catalog) {
   const problems = [];
   for (const [id, value] of Object.entries(options)) {
     const option = known.find((o) => o.id === id);
-    const allowed = option?.type === "boolean" ? ["true", "false"] : (option?.options ?? []).map((o) => o.id);
+    const allowed = option?.values ? option.values.map(String) : option?.type === "boolean" ? ["true", "false"] : (option?.options ?? []).map((o) => o.id);
     if (!option) problems.push(`${at}: no option "${id}" (has ${known.map((o) => o.id).join(", ") || "none"})`);
     else if (!allowed.includes(value)) problems.push(`${at}: ${id}=${value} is not one of ${allowed.join(", ")}`);
   }
