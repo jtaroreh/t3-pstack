@@ -102,3 +102,17 @@ test("unknown child recovery requires an explicit stopped-process assertion with
   expect(JSON.parse(result.stdout)).toMatchObject({ remaining: 1, passed: false, attempts: [{ outcome: "interrupted" }] });
   expect(f.run(["run"]).status).toBe(0);
 });
+test("an escaped descendant holding output pipes cannot hold verification past its termination grace", () => {
+  const f = fixture("true", 2);
+  const worker = join(f.root, ".git/escape.py"), pidFile = join(f.root, ".git/escaped.pid");
+  writeFileSync(worker, `import os,time\nif os.fork(): os._exit(0)\nos.setsid()\nopen(${JSON.stringify(pidFile)},'w').write(str(os.getpid()))\ntime.sleep(60)\n`);
+  const text = readFileSync(f.note, "utf8"), match = text.match(/<!-- pstack-verification (.+) -->/), state = JSON.parse(match[1]);
+  state.verifyCommand = `python3 '${worker}'`; state.timeoutSeconds = 1;
+  writeFileSync(f.note, text.replace(match[1], JSON.stringify(state)));
+  try {
+    const start = Date.now(), result = f.run(["run"]);
+    expect(result.status, result.stderr).toBe(1); expect(Date.now() - start).toBeLessThan(4500);
+    expect(JSON.parse(result.stdout)).toMatchObject({ passed: false, attempts: [{ outcome: "unresolved", cleanupComplete: false }] });
+    expect(f.run(["run"]).status).toBe(1);
+  } finally { if (existsSync(pidFile)) { try { process.kill(Number(readFileSync(pidFile, "utf8")), "SIGKILL"); } catch {} } }
+});

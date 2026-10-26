@@ -75,6 +75,7 @@ try {
       last.operatorAssertedStoppedAt = new Date().toISOString(); save();
     }
     if (verb === "run") {
+      if (last?.outcome === "unresolved") throw Error("previous verification cleanup is unresolved; inspect its processes and reconcile explicitly");
       if (last?.childPid && groupAlive(last.childPid)) throw Error("previous verification process group remains active; reconcile it before another attempt");
       if (last?.outcome === "running") {
         if (alive(last.parentPid) || alive(last.childPid) || !last.childPid) throw Error("previous verification is active or unresolved; reconcile its processes before another run");
@@ -85,22 +86,28 @@ try {
       const attempt = { number: state.attempts.length + 1, startedAt: new Date().toISOString(), parentPid: process.pid, childPid: null, outcome: "running", exitCode: null, fingerprint: before };
       state.attempts.push(attempt); save();
       const child = spawn("/bin/sh", ["-c", state.verifyCommand], { cwd: state.cwd, detached: true, stdio: ["ignore", "pipe", "pipe"] });
-      attempt.childPid = child.pid ?? null; save();
-      let output = "", interrupted = false, timedOut = false, spawnFailed = false, escalation;
-      const stop = () => { try { process.kill(-child.pid, "SIGTERM"); } catch {} escalation ??= setTimeout(() => { try { process.kill(-child.pid,"SIGKILL"); } catch {} }, 500); };
+      let output = "", interrupted = false, timedOut = false, spawnFailed = false, escalation, pipeDeadline, outputAbandoned = false;
+      const stop = () => {
+        try { process.kill(-child.pid, "SIGTERM"); } catch {}
+        escalation ??= setTimeout(() => { try { process.kill(-child.pid,"SIGKILL"); } catch {} }, 500);
+        pipeDeadline ??= setTimeout(() => {
+          outputAbandoned = true; child.stdout.destroy(); child.stderr.destroy();
+        }, 1500);
+      };
       const interrupt = () => { interrupted = true; stop(); };
       process.on("SIGINT", interrupt); process.on("SIGTERM", interrupt);
       const timer = setTimeout(() => { timedOut = true; stop(); }, state.timeoutSeconds * 1000);
       const capture = chunk => { output = (output + chunk.toString()).slice(-65536); };
       child.stdout.on("data", capture); child.stderr.on("data", capture); child.on("error", () => { spawnFailed = true; });
+      attempt.childPid = child.pid ?? null; save();
       const result = await new Promise(done => child.on("close", (code, signal) => done({ code, signal })));
       clearTimeout(timer);
       if (groupAlive(child.pid)) stop();
       if (escalation) await new Promise(resolve => setTimeout(resolve, 550));
       const cleanupDeadline = Date.now() + 1500;
       while (groupAlive(child.pid) && Date.now() < cleanupDeadline) await new Promise(resolve => setTimeout(resolve, 25));
-      attempt.cleanupComplete = !groupAlive(child.pid);
-      clearTimeout(escalation); process.removeListener("SIGINT", interrupt); process.removeListener("SIGTERM", interrupt);
+      attempt.cleanupComplete = !groupAlive(child.pid) && !outputAbandoned;
+      clearTimeout(escalation); clearTimeout(pipeDeadline); process.removeListener("SIGINT", interrupt); process.removeListener("SIGTERM", interrupt);
       attempt.exitCode = result.code; attempt.finishedAt = new Date().toISOString();
       attempt.outcome = !attempt.cleanupComplete ? "unresolved" : timedOut ? "timeout" : interrupted || result.signal ? "interrupted" : spawnFailed ? "could not run" : result.code === 0 ? "pass" : "fail";
       attempt.evidence = `${note}.attempt-${attempt.number}.log`;

@@ -10,6 +10,8 @@ export async function workerMessage(controller, id, verb, options) {
   const text = verb === "steer" ? options.instruction : options.text;
   const request = options["request-id"];
   const record = controller.store.require(id);
+  const prefix = `swarms/${record.sessionId}/tasks/`;
+  if (!mutation && options.cursor !== undefined && (typeof options.cursor !== "string" || options.cursor.length > 1024 || !options.cursor.startsWith(prefix))) throw new CloudError("INVALID_ARGUMENT", "Question cursor does not belong to this run.");
   if (!record.execution || record.state !== "running") throw new CloudError("RUN_NOT_ACTIVE", "Worker messaging requires a resolved running execution.");
   if (mutation && (typeof text !== "string" || !text.trim() || text.length > 8000 || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$/.test(request ?? ""))) throw new CloudError("INVALID_ARGUMENT", "Supply message text and a stable --request-id.");
   if (mutation && !(verb === "steer" && task === "all") && (!/^\d+$/.test(task ?? "") || Number(task) >= record.plan.tasksCount)) throw new CloudError("INVALID_ARGUMENT", "Task index is outside this run.");
@@ -35,11 +37,14 @@ export async function workerMessage(controller, id, verb, options) {
     }
   }
   const args = ["-u", adapter, "--engine", record.engine, "--verb", verb, "--session-id", record.sessionId, "--gcs-bucket", record.plan.gcsBucket, "--max-tasks", String(record.plan.tasksCount)];
+  if (!mutation && options.cursor) args.push("--cursor", options.cursor);
   if (mutation) args.push("--task", task, "--text-stdin");
   if (verb === "reply") args.push("--seq", String(seq));
   const result = await controller.external(id, verb, executable("python3"), args, { cwd: record.cwd, ...(mutation ? { input: text } : {}) });
   if (result.code !== 0) throw new CloudError("MAILBOX_FAILED", "The mailbox operation failed. An empty question list or delivery must not be assumed.", { diagnostics: controller.diagnostics(record, verb, result.stderr) });
-  const payload = parseJson(result.stdout);
+  const response = parseJson(result.stdout);
+  if (!mutation && (!response || !Array.isArray(response.questions) || !(response.nextCursor === null || typeof response.nextCursor === "string" && response.nextCursor.length <= 1024 && response.nextCursor.startsWith(prefix)))) throw new CloudError("MAILBOX_INVALID", "Mailbox returned invalid question pagination.");
+  const payload = mutation ? response : response.questions;
   if (!Array.isArray(payload) || payload.length > (verb === "questions" ? 256 : record.plan.tasksCount) || payload.some(item => !item || !Number.isSafeInteger(item.taskIndex) || item.taskIndex < 0 || item.taskIndex >= record.plan.tasksCount || !Number.isSafeInteger(item.seq) || item.seq < 1
     || (verb === "questions" ? typeof item.question !== "string" || item.question.length > 8000 : item.status !== "submitted"))) throw new CloudError("MAILBOX_INVALID", "Mailbox returned an invalid response.");
   if (mutation && (payload.length !== (verb === "steer" && task === "all" ? record.plan.tasksCount : 1)
@@ -51,5 +56,5 @@ export async function workerMessage(controller, id, verb, options) {
     current.messages[key] = { ...current.messages[key], status: "submitted", result: safe };
     controller.save(current);
   });
-  return safe;
+  return mutation ? safe : { questions: safe, nextCursor: response.nextCursor };
 }

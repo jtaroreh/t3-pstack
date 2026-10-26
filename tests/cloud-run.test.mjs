@@ -561,7 +561,7 @@ test("worker messages use run-owned context and deduplicate a delivery request",
   expect(f.events().filter(e=>e.kind==="mailbox")).toHaveLength(1);
   error(f.run([...args.slice(0,5),"different",...args.slice(6)]),"REQUEST_COLLISION");
   error(f.run(["steer",run.id,"--task","2","--instruction","x","--request-id","two"]),"INVALID_ARGUMENT");
-  expect(ok(f.run(["questions",run.id]))).toEqual([{taskIndex:0,seq:1,question:"Which test should run?"}]);
+  expect(ok(f.run(["questions",run.id]))).toEqual({questions:[{taskIndex:0,seq:1,question:"Which test should run?"}],nextCursor:null});
   expect(ok(f.run(["reply",run.id,"--task","0","--seq","1","--text","Run parser tests","--request-id","answer-one"]))[0].status).toBe("submitted");
   expect(JSON.stringify(f.record())).not.toContain("Limit edits");
 });
@@ -589,7 +589,7 @@ test("progress survives observer restart and retains only bounded safe counters"
   await until(() => existsSync(join(f.root, "attached")));
   await until(() => { const result = f.run(["progress", record.id]); return result.status === 0 && result.data?.at(-1)?.succeeded === 1; });
   const events = ok(f.run(["progress", record.id]));
-  expect(events).toHaveLength(256);
+  expect(events).toHaveLength(2);
   expect(events.at(-1)).toMatchObject({ runId: record.id, taskIndex: null, phase: "progress", succeeded: 1 });
   expect(JSON.stringify(events)).not.toContain("CLOUD_SENTINEL");
   expect(events.every(e => e.succeeded + e.running + e.failed <= e.total)).toBe(true);
@@ -597,7 +597,7 @@ test("progress survives observer restart and retains only bounded safe counters"
   f.set({ progressNoise: false });
   const again = f.start(["attach", record.id]);
   expect(await again.done).toBe(0);
-  expect(ok(f.run(["progress", record.id]))).toHaveLength(256);
+  expect(ok(f.run(["progress", record.id]))).toHaveLength(2);
   expect(ok(f.run(["progress", record.id])).at(-1).succeeded).toBe(1);
 });
 
@@ -636,7 +636,7 @@ test("missing results remain missing and interrupted harvest remains quarantined
 });
 test("ordinary credential-shaped questions remain valid structured responses", () => {
   const f = fixture({ question: "Which token budget?" }); const run = ok(f.run());
-  const questions = ok(f.run(["questions", run.id]));
+  const { questions } = ok(f.run(["questions", run.id]));
   expect(questions).toHaveLength(1); expect(questions[0].question).toContain("Which token");
 });
 test("attach does not follow an artifact root or implicitly invoke the harvester", async () => {
@@ -657,3 +657,11 @@ test("option-like steering text is delivered through stdin and kept off child ar
   expect(delivery.args).not.toContain("--force");
   expect(delivery.args).not.toContain("--text");
 });
+
+test("progress retains only 256 distinct samples from a noisy observer", async () => {
+  const f = fixture({ progressNoise: true, distinctProgress: true }); const run = ok(f.run());
+  const child = f.start(["attach", run.id]);
+  await until(() => existsSync(join(f.root, "attached"))); f.release("attached");
+  expect(await child.done).toBe(0);
+  expect(ok(f.run(["progress", run.id]))).toHaveLength(256);
+}, 15000);

@@ -133,7 +133,7 @@ if (engine && args[1]?.endsWith("cloud-observe.py")) {
       process.stdout.write("x".repeat(9000));
       process.stdout.write("[Cloud Swarm] Progress: 0/2 succeeded, 0 running, 0 failed.\n");
       console.log("[Cloud Swarm] Progress: 9/2 succeeded, 1 running, 0 failed.");
-      for (let i = 0; i < 270; i++) console.log("[Cloud Swarm] Progress: 0/2 succeeded, 2 running, 0 failed.");
+      for (let i = 0; i < 270; i++) console.log(`[Cloud Swarm] Progress: ${cfg.distinctProgress ? i % 2 : 0}/2 succeeded, ${cfg.distinctProgress ? 2 - i % 2 : 2} running, 0 failed.`);
     }
     process.stdout.write("[Cloud Swarm] Pro");
     await new Promise(resolve => setTimeout(resolve, 10));
@@ -162,7 +162,7 @@ if (engine && args[1]?.endsWith("cloud-mailbox.py")) {
   if (cfg.holdMailbox) await hold("mailbox");
   if (cfg.mailboxFailure) failure();
   if (!option("--engine")?.endsWith("cloud_dispatch.py") || !option("--session-id")?.startsWith("t3-") || option("--gcs-bucket") !== "test-bucket" || option("--max-tasks") !== "2") throw Error("mailbox context mismatch");
-  console.log(JSON.stringify(cfg.mailboxInvalid ? {bad:true} : option("--verb") === "questions" ? [{taskIndex:0,seq:1,question:cfg.question ?? "Which test should run?"}] : [{taskIndex:Number(option("--task") === "all" ? 0 : option("--task")),seq:1,status:"submitted"}]));
+  console.log(JSON.stringify(cfg.mailboxInvalid ? {bad:true} : option("--verb") === "questions" ? {questions:[{taskIndex:0,seq:1,question:cfg.question ?? "Which test should run?"}],nextCursor:null} : [{taskIndex:Number(option("--task") === "all" ? 0 : option("--task")),seq:1,status:"submitted"}]));
   process.exit(0);
 }
 if (engine) {

@@ -26,7 +26,7 @@ After a check, keep a short receipt in the same note:
 ```text
 Command and working directory:
 Tested state: HEAD plus tracked and untracked changes in scope
-Outcome: pass, fail, interrupted, or could not run
+Outcome: pass, fail, timeout, interrupted, unresolved, or could not run
 Exit code: actual value, or unknown
 Evidence: absolute output path or durable tool artifact
 Next action:
@@ -65,3 +65,5 @@ Review the saved command before running it. The command executes with the caller
 A pass requires exit zero and unchanged tracked and untracked contents during verification. Later worktree changes make the receipt stale. Environment changes still require the agent to decide which checks to rerun. Interruptions and timeouts never pass. An unresolved prior process blocks another attempt. Reinitializing the same note cannot replenish its budget. The helper neither repairs code nor schedules work, resets Git, or grants review approval.
 
 If an interrupted attempt has no recorded child PID, automatic recovery cannot prove that no child started. Inspect the command's processes first. After establishing that all its processes stopped, `reconcile --note /absolute/task.md --assert-stopped` records that operator assertion and marks the attempt interrupted. It never restores the spent attempt or turns its receipt into a pass. Known live processes still block reconciliation.
+
+The timeout includes a bounded termination grace period. Descendants that escape their process group cannot be assumed stopped. If output pipes remain open after group termination, the verifier closes observation, records unresolved cleanup, and blocks another attempt until explicit reconciliation.

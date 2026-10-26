@@ -381,8 +381,8 @@ export class CloudController {
         // Downloads can outlive any fixed timeout; attach uses the same policy.
         result = await this.external(id, "harvest", executable("python3"), args, { cwd: record.cwd, timeout: 0 });
         if (result.code === 0) {
-          artifactRoot(record);
-          result = await this.external(id, "harvest-results", executable("python3"), ["-u", fileURLToPath(new URL("./cloud-results.py", import.meta.url)), "--session-id", record.sessionId, "--gcs-bucket", record.plan.gcsBucket, "--max-tasks", String(record.plan.tasksCount), "--destination", artifactRoot(record)], { cwd: record.cwd, timeout: 0 });
+          const root = artifactRoot(record);
+          result = await this.external(id, "harvest-results", executable("python3"), ["-u", fileURLToPath(new URL("./cloud-results.py", import.meta.url)), "--session-id", record.sessionId, "--gcs-bucket", record.plan.gcsBucket, "--max-tasks", String(record.plan.tasksCount), "--destination", root], { cwd: record.cwd, timeout: 0 });
         }
       } catch (error) {
         await this.store.locked(id, () => {

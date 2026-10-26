@@ -22,14 +22,32 @@ const source = process.env.AGYSTACK_TEST_SOURCE;
     const seed = `import sys\nsys.path.insert(0,sys.argv[1])\nfrom storage_messenger import StorageMessenger\nStorageMessenger(bucket_name='test-bucket',session_id='t3-test',task_index=0,local_dir=sys.argv[2]).send_question('Which parser?')\n`;
     expect(spawnSync("python3", ["-c", seed, scripts, root], { encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } }).status).toBe(0);
     const run = (verb, args = [], input) => spawnSync("python3", [adapter, "--engine", join(scripts, "cloud_dispatch.py"), "--local-dir", root, "--session-id", "t3-test", "--gcs-bucket", "test-bucket", "--max-tasks", "2", "--verb", verb, ...args], { encoding: "utf8", input, env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
-    expect(JSON.parse(run("questions").stdout)).toEqual([{ taskIndex: 0, seq: 1, question: "Which parser?" }]);
+    expect(JSON.parse(run("questions").stdout).questions).toEqual([{ taskIndex: 0, seq: 1, question: "Which parser?" }]);
     expect(run("reply", ["--task", "0", "--seq", "1", "--text-stdin"], "--force").status).toBe(0);
     expect(run("reply", ["--task", "0", "--seq", "1", "--text-stdin"], "replacement").status).toBe(1);
-    expect(JSON.parse(run("questions").stdout)).toEqual([]);
+    expect(JSON.parse(run("questions").stdout).questions).toEqual([]);
     const broadcast = run("steer", ["--task", "all", "--text-stdin"], "Use the existing parser");
     expect(broadcast.status, broadcast.stderr).toBe(0); expect(JSON.parse(broadcast.stdout)).toHaveLength(2);
     const path = join(root, "test-bucket/swarms/t3-test/tasks/task-0/outbox/0001_question.json");
     const data = JSON.parse(readFileSync(path, "utf8")); data.session_id = "another-run"; writeFileSync(path, JSON.stringify(data));
     const malformed = run("questions"); expect(malformed.status).toBe(1); expect(malformed.stderr).toContain("MAILBOX_INPUT");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+(source ? test : test.skip)("question pagination advances past unrelated objects and returns every pending question", () => {
+  const root = mkdtempSync(join(tmpdir(), "mailbox-pages-"));
+  try {
+    const scripts = join(source, "skills/swarm/scripts"), adapter = resolve("plugins/pstack/skills/t3-agystack/scripts/cloud-mailbox.py");
+    const seed = `import sys\nfrom pathlib import Path\nsys.path.insert(0,sys.argv[1])\nfrom storage_messenger import StorageMessenger\nm=StorageMessenger(bucket_name='test-bucket',session_id='t3-test',task_index=0,local_dir=sys.argv[2])\nfor i in range(260): m.send_question('Question '+str(i))\ninbox=Path(sys.argv[2])/'test-bucket/swarms/t3-test/tasks/task-0/inbox'\ninbox.mkdir(parents=True,exist_ok=True)\nfor i in range(4100): (inbox/f'{i:04d}_steer.json').write_text('{}')\n`;
+    expect(spawnSync("python3", ["-c", seed, scripts, root], { encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } }).status).toBe(0);
+    let cursor = null; const questions = [], sizes = [];
+    for (let page = 0; page < 5; page++) {
+      const result = spawnSync("python3", [adapter, "--engine", join(scripts, "cloud_dispatch.py"), "--local-dir", root, "--session-id", "t3-test", "--gcs-bucket", "test-bucket", "--max-tasks", "1", "--verb", "questions", ...(cursor ? ["--cursor", cursor] : [])], { encoding: "utf8", env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" } });
+      expect(result.status, result.stderr).toBe(0);
+      const data = JSON.parse(result.stdout); sizes.push(data.questions.length); questions.push(...data.questions); cursor = data.nextCursor;
+      if (cursor === null) break;
+    }
+    expect(cursor).toBeNull(); expect(sizes).toEqual([0, 256, 4]);
+    expect(new Set(questions.map(q => q.seq)).size).toBe(260);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

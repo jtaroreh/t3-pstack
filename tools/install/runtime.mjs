@@ -4,6 +4,7 @@ import { enginePath } from "../../plugins/pstack/skills/t3-agystack/scripts/clou
 function probe(name, args, env, timeout) {
   const result = spawnSync(name, args, { env, encoding: "utf8", timeout, maxBuffer: 4096, windowsHide: true });
   if (result.error?.code === "ENOENT") return { name, ok: false, status: "missing", detail: "not found on PATH" };
+  if (result.error?.code === "ETIMEDOUT") return { name, ok: false, status: "unknown", detail: "version probe timed out; availability remains unconfirmed" };
   if (result.error || result.signal || result.status !== 0) return { name, ok: false, status: "unknown", detail: "probe did not complete successfully; output withheld" };
   return { name, ok: true, status: "ok", detail: result.stdout.match(/\d+\.\d+(?:\.\d+)?(?:[-+][\w.-]+)?/)?.[0] ?? "available" };
 }

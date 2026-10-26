@@ -124,7 +124,10 @@ export class RunStore {
     return events.map(({ runId, taskIndex, time, phase, succeeded, total, running, failed }) => ({ runId, taskIndex, time, phase, succeeded, total, running, failed }));
   }
   recordProgress(id, counts) {
-    const events = [...this.progress(id), { runId: id, taskIndex: null, time: new Date().toISOString(), phase: "progress", ...counts }].slice(-256);
+    const previous = this.progress(id);
+    const last = previous.at(-1);
+    if (last && ["succeeded", "total", "running", "failed"].every(key => last[key] === counts[key])) return;
+    const events = [...previous, { runId: id, taskIndex: null, time: new Date().toISOString(), phase: "progress", ...counts }].slice(-256);
     const path = `${this.path(id)}.progress`, temporary = `${path}.${randomUUID()}.tmp`;
     const fd = openSync(temporary, "wx", 0o600);
     try { writeFileSync(fd, JSON.stringify(events)); fsyncSync(fd); } finally { closeSync(fd); }

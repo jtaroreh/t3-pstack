@@ -20,6 +20,7 @@ p.add_argument('--seq', type=int)
 p.add_argument('--text')
 p.add_argument('--text-stdin', action='store_true')
 p.add_argument('--local-dir')
+p.add_argument('--cursor')
 a = p.parse_args()
 try:
     if a.text_stdin:
@@ -55,19 +56,34 @@ try:
         return {'taskIndex': task, 'seq': seq, 'question': text}
 
     if a.verb == 'questions':
-        result = []
-        for count, blob in enumerate(messenger.bucket.list_blobs(prefix=prefix)):
-            if count >= 4096:
-                raise MailboxInputError('mailbox listing limit reached')
-            if not pattern.fullmatch(blob.name):
+        cursor = a.cursor or ''
+        if cursor and (len(cursor) > 1024 or not cursor.startswith(prefix)):
+            raise MailboxInputError('cursor does not belong to this run')
+        if a.local_dir:
+            blobs = sorted(messenger.bucket.list_blobs(prefix=prefix), key=lambda blob: blob.name)
+        else:
+            blobs = messenger.bucket.list_blobs(prefix=prefix, start_offset=cursor or prefix, max_results=4096)
+        items = []
+        next_cursor = None
+        scanned = 0
+        for blob in blobs:
+            if blob.name <= cursor:
                 continue
-            item = question(blob)
-            reply = messenger.bucket.blob(f"{prefix}task-{item['taskIndex']}/inbox/{item['seq']:04d}_reply.json")
-            if not reply.exists():
-                result.append(item)
-            if len(result) > 256:
-                raise MailboxInputError('too many pending questions')
-        result.sort(key=lambda item: (item['taskIndex'], item['seq']))
+            scanned += 1
+            next_cursor = blob.name
+            if len(blob.name) > 1024:
+                raise MailboxInputError('mailbox object name exceeds cursor bound')
+            if pattern.fullmatch(blob.name):
+                item = question(blob)
+                reply = messenger.bucket.blob(f"{prefix}task-{item['taskIndex']}/inbox/{item['seq']:04d}_reply.json")
+                if not reply.exists():
+                    items.append(item)
+            if scanned >= 4095 or len(items) >= 256:
+                break
+        else:
+            next_cursor = None
+        items.sort(key=lambda item: (item['taskIndex'], item['seq']))
+        result = {'questions': items, 'nextCursor': next_cursor}
     else:
         if not a.text or not a.text.strip() or len(a.text) > 8000:
             raise MailboxInputError('message text required, at most 8000 characters')
@@ -102,6 +118,7 @@ try:
 except MailboxInputError as error:
     print(f'MAILBOX_INPUT: {error}', file=sys.stderr)
     sys.exit(1)
-except Exception:
-    print('Mailbox operation failed; no successful delivery or empty listing is implied.', file=sys.stderr)
+except Exception as error:
+    category = type(error).__name__ if type(error).__name__ in {'Forbidden', 'Unauthorized', 'NotFound', 'PreconditionFailed', 'TooManyRequests', 'ServiceUnavailable', 'TimeoutError', 'ConnectionError'} else 'RemoteError'
+    print(f'MAILBOX_{category}: Mailbox operation failed; no successful delivery or empty listing is implied.', file=sys.stderr)
     sys.exit(1)
