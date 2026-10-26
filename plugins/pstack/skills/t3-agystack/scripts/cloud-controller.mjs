@@ -2,6 +2,8 @@
 // 0600 diagnostics files. There is no win32 fallback by design.
 import { readFileSync, realpathSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { artifactRoot, listArtifacts } from "./cloud-artifacts.mjs";
 import { CloudError, hash, runId, sessionId, terminal } from "./cloud-state.mjs";
 import { enginePath, executable, parseDryRun, parseJson, runProcess } from "./cloud-process.mjs";
 
@@ -369,6 +371,7 @@ export class CloudController {
     return this.store.locked(id, async () => {
       const record = await this.store.locked(id, () => {
         const current = this.store.require(id);
+        artifactRoot(current);
         current.harvest = { status: "fetching", startedAt: now(), directory: join(current.cwd, ".slices", current.sessionId) };
         return this.save(current);
       });
@@ -377,6 +380,10 @@ export class CloudController {
       try {
         // Downloads can outlive any fixed timeout; attach uses the same policy.
         result = await this.external(id, "harvest", executable("python3"), args, { cwd: record.cwd, timeout: 0 });
+        if (result.code === 0) {
+          artifactRoot(record);
+          result = await this.external(id, "harvest-results", executable("python3"), ["-u", fileURLToPath(new URL("./cloud-results.py", import.meta.url)), "--session-id", record.sessionId, "--gcs-bucket", record.plan.gcsBucket, "--max-tasks", String(record.plan.tasksCount), "--destination", artifactRoot(record)], { cwd: record.cwd, timeout: 0 });
+        }
       } catch (error) {
         await this.store.locked(id, () => {
           const current = this.store.require(id);
@@ -401,6 +408,7 @@ export class CloudController {
       });
     }, "harvest");
   }
+  artifacts(id) { return listArtifacts(this.store.require(id)); }
   progress(id) { return this.store.progress(id); }
   async attach(id) {
     return this.store.locked(id, () => this.observe(id), "observe");

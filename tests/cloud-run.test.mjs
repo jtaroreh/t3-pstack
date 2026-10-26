@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -599,4 +599,38 @@ test("progress survives observer restart and retains only bounded safe counters"
   expect(await again.done).toBe(0);
   expect(ok(f.run(["progress", record.id]))).toHaveLength(256);
   expect(ok(f.run(["progress", record.id])).at(-1).succeeded).toBe(1);
+});
+
+test("artifacts expose local hashes without promoting failed or unfinished runs", () => {
+  const f = fixture();
+  const record = ok(f.run());
+  expect(ok(f.run(["artifacts", record.id])).artifacts).toEqual([]);
+  ok(f.run(["harvest", record.id]));
+  let artifacts = ok(f.run(["artifacts", record.id])).artifacts;
+  expect(artifacts.map(a => a.kind)).toEqual(["patch", "results"]);
+  expect(artifacts.every(a => a.status === "quarantined" && /^[a-f0-9]{64}$/.test(a.sha256) && existsSync(a.path))).toBe(true);
+  f.set({ remote: "succeeded" }); ok(f.run(["status", record.id]));
+  expect(ok(f.run(["artifacts", record.id])).artifacts.every(a => a.status === "unverified")).toBe(true);
+  f.set({ resultsFailure: true }); error(f.run(["harvest", record.id]), "HARVEST_FAILED");
+  expect(ok(f.run(["artifacts", record.id])).artifacts.every(a => a.status === "quarantined")).toBe(true);
+});
+test("artifact paths reject directory and file symlinks before harvesting", () => {
+  const f = fixture(); const record = ok(f.run());
+  const slices = join(f.root, ".slices"); mkdirSync(slices);
+  symlinkSync(f.root, join(slices, record.sessionId));
+  error(f.run(["harvest", record.id]), "ARTIFACT_PATH");
+  expect(f.events().filter(e => e.kind === "harvest")).toHaveLength(0);
+  rmSync(join(slices, record.sessionId));
+  ok(f.run(["harvest", record.id]));
+  const file = join(slices, record.sessionId, "patch.diff"); rmSync(file); symlinkSync(f.manifest, file);
+  error(f.run(["artifacts", record.id]), "ARTIFACT_PATH");
+});
+test("missing results remain missing and interrupted harvest remains quarantined", async () => {
+  const f = fixture({ resultsMissing: true }); const record = ok(f.run());
+  ok(f.run(["harvest", record.id]));
+  expect(ok(f.run(["artifacts", record.id])).artifacts.map(a => a.kind)).toEqual(["patch"]);
+  f.set({ holdHarvest: true }); const child = f.start(["harvest", record.id]);
+  await until(() => existsSync(join(f.root, "harvesting"))); child.kill("SIGTERM");
+  expect(await child.done).not.toBe(0);
+  expect(ok(f.run(["artifacts", record.id]))).toMatchObject({ harvest: "interrupted", artifacts: [{ kind: "patch", status: "quarantined" }] });
 });

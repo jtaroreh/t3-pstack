@@ -127,6 +127,15 @@ function executionV2(name, session, state) {
   };
 }
 
+if (engine && args[1]?.endsWith("cloud-results.py")) {
+  event({ kind: "results", args });
+  if (cfg.resultsFailure) failure();
+  const dest = join(option("--destination"), "task-0");
+  mkdirSync(dest, { recursive: true });
+  if (!cfg.resultsMissing) writeFileSync(join(dest, "results.tsv"), "score\tlatency\n10\t4\n");
+  console.log("[]");
+  process.exit(0);
+}
 if (engine && args[1]?.endsWith("cloud-mailbox.py")) {
   event({kind:"mailbox",args});
   if (cfg.holdMailbox) await hold("mailbox");
