@@ -172,16 +172,19 @@ export function buildProjection({ sourceRoot, destSkillsDir, packageRoot }) {
   const adapterBytes = readFileSync(adapterSKILLPath);
   entries.push({ kind: "adapter-skill", path: `${ADAPTER_SKILL_NAME}/SKILL.md`, bytes: adapterBytes, hash: sha256Hex(adapterBytes), anchor: shortHash(adapterBytes) });
 
-  // The adapter's bridge scripts ship as a resource set (cloud-run.mjs and the
-  // sibling modules it imports). Copy them all generically when the installed
-  // package provides them, so the skill's relative references keep working.
-  const scriptsDir = join(packageRoot, "plugins/pstack/skills", ADAPTER_SKILL_NAME, "scripts");
-  if (existsSync(scriptsDir)) {
-    for (const file of listResourceFiles(scriptsDir)) {
-      const rel = relative(scriptsDir, file).split("\\").join("/");
-      const bytes = readFileSync(file);
-      entries.push({ kind: "adapter-resource", path: `${ADAPTER_SCRIPTS_DIR}/${rel}`, bytes, hash: sha256Hex(bytes) });
-    }
+  const packageSkills = join(packageRoot, "plugins/pstack/skills");
+  const resources = ["scripts", "references"].flatMap(name => {
+    const directory = join(packageSkills, ADAPTER_SKILL_NAME, name);
+    return existsSync(directory) ? listResourceFiles(directory) : [];
+  });
+  for (const path of ["swarm/scripts/rank-candidates.mjs", "swarm/references/candidate-ranking.md"]) {
+    const file = join(packageSkills, path);
+    if (existsSync(file)) resources.push(file);
+  }
+  for (const file of resources) {
+    const path = relative(packageSkills, file).split("\\").join("/");
+    const bytes = readFileSync(file);
+    entries.push({ kind: "adapter-resource", path, bytes, hash: sha256Hex(bytes) });
   }
 
   for (const skill of sourceSkills) {

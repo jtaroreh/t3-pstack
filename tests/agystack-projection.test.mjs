@@ -534,3 +534,18 @@ describe("the CLI", () => {
     for (const dir of [home, source]) rmSync(dir, { recursive: true, force: true });
   });
 });
+test("the real adapter projection includes its guides and ranking CLI without changing native skill bytes", () => {
+  const home = workdir(), source = fixtureSource(workdir()), destSkills = join(home, "skills");
+  try {
+    const build = buildProjection({ sourceRoot: source, destSkillsDir: destSkills, packageRoot: repoRoot });
+    project({ build });
+    for (const path of ["t3-agystack/references/cloud-operations.md", "swarm/references/candidate-ranking.md", "swarm/scripts/rank-candidates.mjs"]) {
+      expect(sha(join(destSkills, path))).toBe(sha(join(repoRoot, "plugins/pstack/skills", path)));
+    }
+    const result = spawnSync("node", [join(destSkills, "swarm/scripts/rank-candidates.mjs"), "--help"], { encoding: "utf8" });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("--metric");
+    expect(project({ build }).applied).toHaveLength(0);
+    expect(doctor({ sourceRoot: source, destSkillsDir: destSkills, packageRoot: repoRoot }).status).toBe("ok");
+  } finally { for (const dir of [home, source]) rmSync(dir, { recursive: true, force: true }); }
+});
