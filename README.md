@@ -36,6 +36,10 @@ Ordinary implementation receives final review. Consequential decisions receive f
 
 The plugin carries 68 skill directories, 24 of them `principle-*` leaves, and 4 agents.
 
+Optional runtime diagnostics use `node tools/install.mjs doctor --runtime local` or `--runtime cloud --agystack-source /path/to/pstack-agy`. They check local executable and Python-package presence. Authentication, quotas, and model availability remain unproven.
+
+The [agystack capability inventory](docs/agystack-capabilities.md) records the T3-specific integrations and their validation.
+
 For Antigravity, use the [agystack integration](docs/antigravity.md). It keeps agystack's playbooks and Cloud Run swarm backend, with T3 owning the controller tasks.
 
 ## Staying current

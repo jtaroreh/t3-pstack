@@ -1,20 +1,22 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 const cli = fileURLToPath(new URL("../plugins/pstack/skills/poteto-mode/scripts/verify-task.mjs", import.meta.url));
 const roots = [];
 afterEach(() => roots.splice(0).forEach(p => rmSync(p, { recursive: true, force: true })));
-function fixture(command = "test -f fixed", limit = 2) {
+function fixture(command = "test -f fixed", limit = 2, subdir = false) {
   const root = mkdtempSync(join(tmpdir(), "verify-task-")); roots.push(root);
   const git = args => { const p = spawnSync("git", ["-C",root,...args],{encoding:"utf8"}); if(p.status)throw Error(p.stderr); };
   git(["init","-q"]); writeFileSync(join(root,"user.txt"),"keep me"); git(["add","user.txt"]);
   git(["-c","user.name=Test","-c","user.email=test@example.invalid","commit","-qm","initial"]);
   const note = join(root,".git","task.md"); writeFileSync(note,"Existing task constraints\n");
   const run = (args) => spawnSync("node",[cli,...args,"--note",note],{encoding:"utf8",timeout:5000});
-  expect(run(["init","--cwd",root,"--verify",command,"--limit",String(limit),"--timeout","2"]).status).toBe(0);
+  const cwd = subdir ? join(root, "package") : root;
+  if (subdir) mkdirSync(cwd);
+  expect(run(["init","--cwd",cwd,"--verify",command,"--limit",String(limit),"--timeout","2"]).status).toBe(0);
   return {root,note,run};
 }
 test("fail, correction, pass, then changed untracked content makes the receipt stale", () => {
@@ -47,4 +49,11 @@ test("an interrupted verifier preserves its spent attempt across a new process",
   p.kill("SIGTERM"); await done;
   const status=JSON.parse(f.run(["status"]).stdout);
   expect(status.remaining).toBe(1); expect(status.attempts[0].outcome).toBe("interrupted"); expect(status.passed).toBe(false);
+});
+
+test("verification from a subdirectory detects changed untracked files elsewhere in the repository", () => {
+  const f = fixture("true", 1, true);
+  expect(f.run(["run"]).status).toBe(0);
+  writeFileSync(join(f.root, "outside-package.txt"), "changed");
+  expect(JSON.parse(f.run(["status"]).stdout).passed).toBe(false);
 });

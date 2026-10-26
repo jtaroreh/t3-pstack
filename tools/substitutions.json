@@ -983,7 +983,7 @@
     },
     {
       "pattern": "# Swarm",
-      "replacement": "# Swarm\n\nFor an explicitly requested agystack Cloud Run swarm, read\n[t3-agystack](../t3-agystack/SKILL.md) and use its cloud-controller workflow.\nAgystack owns the external container workers. T3 tracks their controller task.\nThe local worker flow below still applies to swarms running on this machine.",
+      "replacement": "# Swarm\n\nFor an explicitly requested agystack Cloud Run swarm, read\n[t3-agystack](../t3-agystack/SKILL.md) and use its cloud-controller workflow.\nAgystack owns the external container workers. T3 tracks their controller task.\nThe local worker flow below still applies to swarms running on this machine.\n\nWhen comparing verified local or cloud candidates, use [candidate ranking](references/candidate-ranking.md) for mixed metric directions and optional Pareto filtering. The helper never applies patches.",
       "rationale": "Preserves the existing agystack Cloud Run adapter route through upstream regeneration without forking the local swarm workflow.",
       "files": "^skills/swarm/SKILL\\.md$"
     },

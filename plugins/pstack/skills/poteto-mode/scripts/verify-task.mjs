@@ -11,6 +11,7 @@ const marker = /\n<!-- pstack-verification (.+) -->\n/;
 const hash = value => createHash("sha256").update(value).digest("hex");
 const git = (cwd, args) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
 function fingerprint(cwd) {
+  cwd = git(cwd, ["rev-parse", "--show-toplevel"]).trim();
   const parts = [git(cwd, ["rev-parse", "HEAD"]), git(cwd, ["diff", "--binary", "HEAD"])];
   for (const name of git(cwd, ["ls-files", "--others", "--exclude-standard", "-z"]).split("\0").filter(Boolean).sort()) {
     const file = resolve(cwd, name); parts.push(name, lstatSync(file).isSymbolicLink() ? readlinkSync(file) : hash(readFileSync(file)));

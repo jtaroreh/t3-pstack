@@ -11,6 +11,8 @@ For an explicitly requested agystack Cloud Run swarm, read
 Agystack owns the external container workers. T3 tracks their controller task.
 The local worker flow below still applies to swarms running on this machine.
 
+When comparing verified local or cloud candidates, use [candidate ranking](references/candidate-ranking.md) for mixed metric directions and optional Pareto filtering. The helper never applies patches.
+
 ## Start
 
 Open a todolist with one entry per phase before launching anything.

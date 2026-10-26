@@ -66,7 +66,9 @@ provenance: <absolute path of the resolved t3-agystack SKILL.md>
 ---
 ```
 
-That child invokes the cloud bridge at `scripts/cloud-run.mjs` next to this file, with its sibling modules beside it. The verbs are `dispatch/status/resume/cancel/harvest/list/attach`; `dispatch` requires a fresh `--client-request-id` and may carry `--controller-task-id` as provenance. The bridge fronts the agystack engine with durable run records, never repeats an attempted launch, and treats cancellation as explicit until remote terminal evidence. Cloud models, auth, and config stay independent of the composer model and of the projection. Killing the controller does not cancel the remote job. One controller per run; a second run wants a second brief or a widened envelope from the coordinator in writing.
+That child invokes the cloud bridge at `scripts/cloud-run.mjs` next to this file, with its sibling modules beside it. The verbs are `dispatch/status/resume/cancel/harvest/list/attach/steer/questions/reply/progress/artifacts`; `dispatch` requires a fresh `--client-request-id` and may carry `--controller-task-id` as provenance. The bridge fronts the agystack engine with durable run records, never repeats an attempted launch, and treats cancellation as explicit until remote terminal evidence. Cloud models, auth, and config stay independent of the composer model and of the projection. Killing the controller does not cancel the remote job. One controller per run; a second run wants a second brief or a widened envelope from the coordinator in writing.
+
+For worker steering, question replies, durable progress, and local artifact receipts, read [cloud operations](references/cloud-operations.md). Use [candidate ranking](../swarm/references/candidate-ranking.md) after independently verifying downloaded candidates.
 
 ## Model routing
 
