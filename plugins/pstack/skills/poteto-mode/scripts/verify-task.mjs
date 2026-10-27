@@ -42,7 +42,7 @@ try {
   const [verb] = positionals;
   if (positionals.length !== 1 || !["init", "run", "status", "reconcile"].includes(verb) || !v.note) throw Error("usage: verify-task.mjs init --note FILE --cwd DIR --verify COMMAND --limit N [--timeout SECONDS], or run|status --note FILE, or reconcile --note FILE --assert-stopped");
   const note = resolve(v.note);
-  if (verb !== "init" && Object.keys(v).some(k => k !== "note" && !(verb === "reconcile" && k === "assert-stopped"))) throw Error("run and status use the saved verification contract; only --note is accepted");
+  if (verb !== "init" && Object.keys(v).some(k => k !== "note" && !(verb === "reconcile" && k === "assert-stopped"))) throw Error("run, status and reconcile accept only their documented options");
   server = createServer();
   await new Promise((ok, fail) => { server.once("error", () => fail(Error("another verifier owns this note or its lock port"))); server.listen(20000 + parseInt(hash(note).slice(0,8),16) % 30000, "127.0.0.1", ok); });
   if (existsSync(note) && !lstatSync(note).isFile()) throw Error("the note must be a regular file");

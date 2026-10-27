@@ -665,3 +665,12 @@ test("progress retains only 256 distinct samples from a noisy observer", async (
   expect(await child.done).toBe(0);
   expect(ok(f.run(["progress", run.id]))).toHaveLength(256);
 }, 15000);
+
+test("questions pass a scoped continuation cursor to the adapter", () => {
+  const f = fixture({ questionPage: true }); const run = ok(f.run());
+  const first = ok(f.run(["questions", run.id])); expect(first.nextCursor).not.toBeNull();
+  const next = ok(f.run(["questions", run.id, "--cursor", first.nextCursor])); expect(next.nextCursor).toBeNull();
+  const delivery = f.events().filter(e => e.kind === "mailbox").at(-1);
+  expect(delivery.args[delivery.args.indexOf("--cursor") + 1]).toBe(first.nextCursor);
+  error(f.run(["questions", run.id, "--cursor", "swarms/another-run/tasks/task-0"]), "INVALID_ARGUMENT");
+});

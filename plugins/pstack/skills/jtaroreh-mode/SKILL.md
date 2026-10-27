@@ -98,6 +98,12 @@ This is a peer-review workflow, not a host tool interceptor. It cannot enforce t
 
 Role defaults on T3, stamped from `plugins/pstack/models.json`. A role line in the model sheet overrides each one. The sheet is `~/.config/t3-pstack/models.md` (`$XDG_CONFIG_HOME/t3-pstack/models.md` when that is set), one per machine, and `/setup-pstack` writes it. When it is missing, read `t3-pstack-models.md` in the host's config directory (`$CLAUDE_CONFIG_DIR` or `~/.claude` on Claude Code, `$CODEX_HOME` or `~/.codex` on Codex). An entry is `<providerInstanceId>/<modelId>` plus `<optionId>=<value>` pairs, and it maps onto `delegate_task`'s `target`, with the provider instance as `providerInstanceId`, the model as `model`, and the pairs as `options`. It splits at its first `/`, so a model ID with its own `/`, such as OpenCode's `<provider>/<model>`, is written whole after it. Option IDs differ per provider, so take them from `orchestrator_capabilities`. `inherit-parent` or `auto` omits `target`.
 
+- jtaroreh workhorse: `antigravity/gemini-3.8-flash-high`
+- jtaroreh advisor: `claudeAgent/claude-opus-5-5 effort=xhigh`
+- jtaroreh takeover: `claudeAgent/claude-fable-5-1 effort=xhigh`
+
+## Provider alternatives
+
 Defaults support active providers including Codex (`codex-pstack`) and Claude (`claudeAgent`):
 
 - jtaroreh workhorse: `antigravity/gemini-3.8-flash-high`

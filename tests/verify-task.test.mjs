@@ -93,10 +93,15 @@ test("evidence writes replace symlinks without touching their targets and use pr
 test("unknown child recovery requires an explicit stopped-process assertion without resetting the budget", () => {
   const f = fixture("true", 2);
   let text = readFileSync(f.note, "utf8"); const match = text.match(/<!-- pstack-verification (.+) -->/);
-  const state = JSON.parse(match[1]); state.attempts.push({ number: 1, outcome: "running", parentPid: 999999, childPid: null });
+  const prior = spawnSync("node", ["-e", ""], { stdio: "ignore" });
+  expect(prior.status).toBe(0); expect(() => process.kill(prior.pid, 0)).toThrow();
+  const state = JSON.parse(match[1]); state.attempts.push({ number: 1, outcome: "running", parentPid: process.pid, childPid: null });
   writeFileSync(f.note, text.replace(match[1], JSON.stringify(state)));
   expect(f.run(["run"]).status).toBe(1);
   expect(f.run(["reconcile"]).status).toBe(1);
+  expect(f.run(["reconcile", "--assert-stopped"]).stderr).toContain("known verification processes remain active");
+  state.attempts[0].parentPid = prior.pid;
+  writeFileSync(f.note, text.replace(match[1], JSON.stringify(state)));
   const result = f.run(["reconcile", "--assert-stopped"]);
   expect(result.status, result.stderr).toBe(0);
   expect(JSON.parse(result.stdout)).toMatchObject({ remaining: 1, passed: false, attempts: [{ outcome: "interrupted" }] });

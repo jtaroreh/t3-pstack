@@ -27,7 +27,7 @@ def main():
     root.mkdir(parents=True, exist_ok=True)
     delivered = []
     prefix = f"swarms/{args.session_id}/task-"
-    pattern = re.compile(re.escape(prefix) + r"(\d+)/results\.tsv$")
+    pattern = re.compile(re.escape(prefix) + r"(0|[1-9][0-9]*)/results\.tsv$")
     for count, blob in enumerate(bucket.list_blobs(prefix=prefix)):
         if count >= 1000000:
             raise ArtifactInputError("Artifact listing limit reached")

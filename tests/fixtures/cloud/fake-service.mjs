@@ -162,7 +162,7 @@ if (engine && args[1]?.endsWith("cloud-mailbox.py")) {
   if (cfg.holdMailbox) await hold("mailbox");
   if (cfg.mailboxFailure) failure();
   if (!option("--engine")?.endsWith("cloud_dispatch.py") || !option("--session-id")?.startsWith("t3-") || option("--gcs-bucket") !== "test-bucket" || option("--max-tasks") !== "2") throw Error("mailbox context mismatch");
-  console.log(JSON.stringify(cfg.mailboxInvalid ? {bad:true} : option("--verb") === "questions" ? {questions:[{taskIndex:0,seq:1,question:cfg.question ?? "Which test should run?"}],nextCursor:null} : [{taskIndex:Number(option("--task") === "all" ? 0 : option("--task")),seq:1,status:"submitted"}]));
+  console.log(JSON.stringify(cfg.mailboxInvalid ? {bad:true} : option("--verb") === "questions" ? {questions:[{taskIndex:0,seq:1,question:cfg.question ?? "Which test should run?"}],nextCursor:cfg.questionPage && !args.includes("--cursor") ? `swarms/${option("--session-id")}/tasks/task-0/outbox/0001_question.json` : null} : [{taskIndex:Number(option("--task") === "all" ? 0 : option("--task")),seq:1,status:"submitted"}]));
   process.exit(0);
 }
 if (engine) {
